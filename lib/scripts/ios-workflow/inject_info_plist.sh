@@ -81,3 +81,25 @@ rm "$INFO_PLIST_PATH.bak" || true
 
 log_success "Info.plist injection completed successfully"
 exit 0 
+
+# This script injects required permissions for voice recognition into Info.plist
+# It is safe to run multiple times (idempotent)
+
+PLIST_PATH="ios/Runner/Info.plist"
+
+add_plist_key() {
+  local key="$1"
+  local value="$2"
+  if ! /usr/libexec/PlistBuddy -c "Print :$key" "$PLIST_PATH" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :$key string $value" "$PLIST_PATH"
+    echo "[INFO] Added $key to Info.plist."
+  else
+    /usr/libexec/PlistBuddy -c "Set :$key $value" "$PLIST_PATH"
+    echo "[INFO] Updated $key in Info.plist."
+  fi
+}
+
+add_plist_key "NSMicrophoneUsageDescription" "This app needs access to the microphone for speech recognition."
+add_plist_key "NSSpeechRecognitionUsageDescription" "This app needs speech recognition access."
+
+echo "[INFO] Info.plist permissions for voice recognition ensured." 
