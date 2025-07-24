@@ -82,18 +82,4 @@ class EnvConfig {
   static const String certKeyUrl = "";
   static const String profileType = "app-store";
   static const String appStoreConnectKeyIdentifier = "";
-
-  // Build Environment
-  static const String buildId = "unknown";
-  static const String buildDir = "";
-  static const String projectRoot = "";
-  static const String outputDir = "output";
-
-  // Utility Methods
-  static bool get isAndroidBuild => workflowId.startsWith('android');
-  static bool get isIosBuild => workflowId.contains('ios');
-  static bool get isCombinedBuild => workflowId == 'combined';
-  static bool get hasFirebase => firebaseConfigAndroid.isNotEmpty || firebaseConfigIos.isNotEmpty;
-  static bool get hasKeystore => keyStoreUrl.isNotEmpty;
-  static bool get hasIosSigning => certPassword.isNotEmpty && profileUrl.isNotEmpty;
 }
