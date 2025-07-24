@@ -337,7 +337,6 @@ class EnvConfig {
   static const String userName = "${USER_NAME:-}";
   static const String emailId = "${EMAIL_ID:-}";
   static const String branch = "main";
-  static const String workflowId = "${WORKFLOW_ID:-}";
 
   // Package Identifiers
 $(if [ "$IS_IOS_WORKFLOW" = true ]; then
