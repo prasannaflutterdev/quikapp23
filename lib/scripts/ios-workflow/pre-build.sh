@@ -69,8 +69,14 @@ if flutter pub deps | grep -q "speech_to_text"; then
     log_success "speech_to_text package is properly resolved"
 else
     log_warning "speech_to_text package not found in dependencies, attempting to fix..."
-    flutter pub add speech_to_text
+    flutter pub add speech_to_text || log_error "Failed to add speech_to_text package" && exit 1
     flutter pub get
+    if flutter pub deps | grep -q "speech_to_text"; then
+        log_success "speech_to_text package added and resolved"
+    else
+        log_error "speech_to_text package could not be resolved after all attempts. Failing build."
+        exit 1
+    fi
 fi
 
 # Run iOS permissions script if it exists
