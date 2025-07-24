@@ -93,9 +93,6 @@ static const String bottommenuItems = r"[]";
   static const String appStoreConnectIssuerId = "";
   static const String appStoreConnectApiKeyUrl = "";
   
-  // Workflow
-  static const String workflowId = "ios-workflow";
-
   // Build Environment
   static const String buildId = "unknown";
   static const String buildDir = "";
