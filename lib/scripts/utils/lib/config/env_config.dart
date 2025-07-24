@@ -14,7 +14,6 @@ class EnvConfig {
   static const String userName = "";
   static const String emailId = "";
   static const String branch = "main";
-  static const String workflowId = "";
 
   // Package Identifiers
   static const String pkgName = "";
