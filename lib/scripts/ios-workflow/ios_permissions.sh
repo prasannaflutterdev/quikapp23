@@ -56,8 +56,9 @@ add_permission() {
         
         # Insert permission before the closing </dict> tag
         awk -v perm="$permission" -v desc="$description" '
+        BEGIN { added = 0 }
         /<\/dict>/ {
-            if (!added) {
+            if (added == 0) {
                 print "	<key>" perm "</key>"
                 print "	<string>" desc "</string>"
                 added = 1
