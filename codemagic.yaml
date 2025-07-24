@@ -654,14 +654,12 @@ workflows:
       - flutter_drive.log
       - output/ios/
 
-    publishing:
-      app_store_connect:
-        api_key:
-          key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-          issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-          private_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        submit_to_testflight: true
-        submit_to_app_store: false
+    # App Store Connect publishing is handled via scripts
+    # when the required environment variables are set in Codemagic
+    # Required variables:
+    # - APP_STORE_CONNECT_KEY_IDENTIFIER
+    # - APP_STORE_CONNECT_ISSUER_ID  
+    # - APP_STORE_CONNECT_PRIVATE_KEY
 
 
   combined:
