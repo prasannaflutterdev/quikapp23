@@ -43,11 +43,11 @@ cd ios
 pod install --repo-update
 cd ..
 
-# Build Flutter app for iOS (without code signing)
+# Build Flutter app for iOS (with code signing)
 log_info "🏗️ Building Flutter app for iOS..."
-flutter build ios --release --no-codesign
+flutter build ios --release
 
-# Create archive
+# Create archive with proper code signing
 log_info "📦 Creating Xcode archive..."
 xcodebuild \
     -workspace ios/Runner.xcworkspace \
@@ -63,7 +63,7 @@ xcodebuild \
     -allowProvisioningUpdates \
     -allowProvisioningDeviceRegistration
 
-# Create export options plist
+# Create export options plist with proper code signing
 log_info "📋 Creating export options..."
 cat > ios/ExportOptions.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -82,6 +82,10 @@ cat > ios/ExportOptions.plist << EOF
     <false/>
     <key>uploadSymbols</key>
     <true/>
+    <key>compileBitcode</key>
+    <false/>
+    <key>thinning</key>
+    <string>&lt;none&gt;</string>
 </dict>
 </plist>
 EOF

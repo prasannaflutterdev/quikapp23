@@ -805,29 +805,37 @@ workflows:
         script: |
           echo "🔧 Pre-build Setup (Modern iOS)"
           
-          # Install Flutter dependencies
-          flutter pub get
-          
-          # Clean previous builds
-          flutter clean
-          rm -rf ios/Pods/ ios/build/ 2>/dev/null || true
-          
-          # Generate environment configuration
-          if [ -f "lib/scripts/utils/gen_env_config.sh" ]; then
-            chmod +x lib/scripts/utils/gen_env_config.sh
-            ./lib/scripts/utils/gen_env_config.sh || echo "⚠️ Environment config generation failed (continuing...)"
-          fi
-          
-          # Download branding assets
-          if [ -f "lib/scripts/ios-workflow/branding_assets.sh" ]; then
-            chmod +x lib/scripts/ios-workflow/branding_assets.sh
-            ./lib/scripts/ios-workflow/branding_assets.sh || echo "⚠️ Branding assets download failed (continuing...)"
-          fi
-          
-          # Inject Info.plist values
-          if [ -f "lib/scripts/ios-workflow/inject_info_plist.sh" ]; then
-            chmod +x lib/scripts/ios-workflow/inject_info_plist.sh
-            ./lib/scripts/ios-workflow/inject_info_plist.sh || echo "⚠️ Info.plist injection failed (continuing...)"
+          # Use our comprehensive pre-build script
+          if [ -f "lib/scripts/ios-workflow/pre-build.sh" ]; then
+            chmod +x lib/scripts/ios-workflow/pre-build.sh
+            ./lib/scripts/ios-workflow/pre-build.sh
+          else
+            echo "⚠️ Pre-build script not found, using fallback..."
+            
+            # Install Flutter dependencies
+            flutter pub get
+            
+            # Clean previous builds
+            flutter clean
+            rm -rf ios/Pods/ ios/build/ 2>/dev/null || true
+            
+            # Generate environment configuration
+            if [ -f "lib/scripts/utils/gen_env_config.sh" ]; then
+              chmod +x lib/scripts/utils/gen_env_config.sh
+              ./lib/scripts/utils/gen_env_config.sh || echo "⚠️ Environment config generation failed (continuing...)"
+            fi
+            
+            # Download branding assets
+            if [ -f "lib/scripts/ios-workflow/branding_assets.sh" ]; then
+              chmod +x lib/scripts/ios-workflow/branding_assets.sh
+              ./lib/scripts/ios-workflow/branding_assets.sh || echo "⚠️ Branding assets download failed (continuing...)"
+            fi
+            
+            # Inject Info.plist values
+            if [ -f "lib/scripts/ios-workflow/inject_info_plist.sh" ]; then
+              chmod +x lib/scripts/ios-workflow/inject_info_plist.sh
+              ./lib/scripts/ios-workflow/inject_info_plist.sh || echo "⚠️ Info.plist injection failed (continuing...)"
+            fi
           fi
           
           echo "✅ Pre-build setup completed"
@@ -836,20 +844,25 @@ workflows:
         script: |
           echo "🏗️ Building iOS App (Modern)"
           
-          # Validate target-only mode
-          if [ "${TARGET_ONLY_MODE:-false}" != "true" ]; then
-            echo "❌ TARGET_ONLY_MODE must be enabled"
+          # Validate required environment variables
+          if [ -z "${BUNDLE_ID:-}" ]; then
+            echo "❌ BUNDLE_ID is required but not set"
             exit 1
           fi
           
-          # Set modern build environment
+          if [ -z "${APPLE_TEAM_ID:-}" ]; then
+            echo "❌ APPLE_TEAM_ID is required but not set"
+            exit 1
+          fi
+          
+          # Set build environment
           export TARGET_ONLY_MODE="true"
           export ENABLE_COLLISION_FIX="false"
           export ENABLE_FRAMEWORK_BUNDLE_UPDATE="false"
           export ENABLE_BUNDLE_ID_ECHO="true"
           
-          # Run build (no retry logic)
-          echo "🏗️ Building iOS app..."
+          # Run comprehensive build with code signing
+          echo "🏗️ Building iOS app with code signing..."
           
           if ./lib/scripts/ios-workflow/comprehensive_build.sh; then
             echo "✅ Build completed successfully"

@@ -50,7 +50,7 @@ export_ipa_from_archive() {
     
     log_info "📦 Exporting IPA from archive: $archive_path"
     
-    # Create export options plist
+    # Create export options plist with proper code signing
     cat > ios/ExportOptions.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -68,6 +68,10 @@ export_ipa_from_archive() {
     <false/>
     <key>uploadSymbols</key>
     <true/>
+    <key>compileBitcode</key>
+    <false/>
+    <key>thinning</key>
+    <string>&lt;none&gt;</string>
 </dict>
 </plist>
 EOF

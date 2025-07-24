@@ -33,6 +33,12 @@ rm -rf build/ 2>/dev/null || true
 log_info "📦 Getting Flutter dependencies..."
 flutter pub get
 
+# Force regenerate iOS project to fix speech_to_text resolution
+log_info "🔧 Regenerating iOS project to fix package resolution..."
+flutter clean
+flutter pub get
+flutter pub deps
+
 # Clean Xcode derived data
 log_info "🧹 Cleaning Xcode derived data..."
 rm -rf ~/Library/Developer/Xcode/DerivedData || true
@@ -56,6 +62,16 @@ log_info "📚 Installing CocoaPods dependencies..."
 cd ios
 pod install --repo-update
 cd ..
+
+# Verify speech_to_text package is properly resolved
+log_info "🔍 Verifying speech_to_text package resolution..."
+if flutter pub deps | grep -q "speech_to_text"; then
+    log_success "speech_to_text package is properly resolved"
+else
+    log_warning "speech_to_text package not found in dependencies, attempting to fix..."
+    flutter pub add speech_to_text
+    flutter pub get
+fi
 
 # Run iOS permissions script if it exists
 if [ -f "lib/scripts/ios-workflow/ios_permissions.sh" ]; then
