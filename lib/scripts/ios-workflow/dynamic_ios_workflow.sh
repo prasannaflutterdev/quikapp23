@@ -234,14 +234,22 @@ log "Email SMTP Port: $EMAIL_SMTP_PORT"
 log "Email SMTP User: $EMAIL_SMTP_USER"
 log "Email SMTP Pass: [HIDDEN]"
 
-# Continue with the rest of the workflow...
 log_success "All dynamic variables loaded successfully from Codemagic API calls"
 
 # Now proceed with the actual workflow steps
 log_info "Starting dynamic iOS workflow with all variables sourced from Codemagic API..."
 
-# Import the certificate generation functions from the enhanced workflow
-source lib/scripts/ios-workflow/enhanced_ios_workflow_with_certificates.sh
+# Check if robust download workflow exists
+if [ -f "lib/scripts/ios-workflow/robust_download_workflow.sh" ]; then
+    log_info "Using robust download workflow for enhanced reliability..."
+    bash lib/scripts/ios-workflow/robust_download_workflow.sh
+elif [ -f "lib/scripts/ios-workflow/enhanced_ios_workflow_with_certificates.sh" ]; then
+    log_info "Using enhanced workflow with certificate generation..."
+    bash lib/scripts/ios-workflow/enhanced_ios_workflow_with_certificates.sh
+else
+    log_error "No suitable workflow script found. Please ensure robust_download_workflow.sh or enhanced_ios_workflow_with_certificates.sh exists."
+    exit 1
+fi
 
 log_success "Dynamic iOS workflow completed successfully"
 exit 0 

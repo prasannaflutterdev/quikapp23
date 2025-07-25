@@ -332,9 +332,12 @@ workflows:
         # Branding & UI
         LOGO_URL: $LOGO_URL
         SPLASH_URL: $SPLASH_URL
+        SPLASH_BG_URL: $SPLASH_BG_URL
         SPLASH_BG_COLOR: $SPLASH_BG_COLOR
         SPLASH_TAGLINE: $SPLASH_TAGLINE
         SPLASH_TAGLINE_COLOR: $SPLASH_TAGLINE_COLOR
+        SPLASH_ANIMATION: $SPLASH_ANIMATION
+        SPLASH_DURATION: $SPLASH_DURATION
         FIREBASE_CONFIG_IOS: $FIREBASE_CONFIG_IOS
         
         # Email Configuration
@@ -370,11 +373,6 @@ workflows:
         IS_CALENDAR: $IS_CALENDAR
         IS_STORAGE: $IS_STORAGE
         
-        # Additional UI Configuration
-        SPLASH_BG_URL: $SPLASH_BG_URL
-        SPLASH_ANIMATION: $SPLASH_ANIMATION
-        SPLASH_DURATION: $SPLASH_DURATION
-        
         # Bottom Menu Configuration
         BOTTOMMENU_ITEMS: $BOTTOMMENU_ITEMS
         BOTTOMMENU_BG_COLOR: $BOTTOMMENU_BG_COLOR
@@ -391,6 +389,12 @@ workflows:
         FIREBASE_CONFIG_ANDROID: $FIREBASE_CONFIG_ANDROID
         APNS_KEY_ID: $APNS_KEY_ID
         APNS_AUTH_KEY_URL: $APNS_AUTH_KEY_URL
+        
+        # Certificate Configuration
+        CERT_PASSWORD: $CERT_PASSWORD
+        CERT_P12_URL: $CERT_P12_URL
+        CERT_CER_URL: $CERT_CER_URL
+        CERT_KEY_URL: $CERT_KEY_URL
       xcode: latest
       cocoapods: default
       flutter: stable
@@ -404,44 +408,31 @@ workflows:
         - "$HOME/Library/Caches/CocoaPods"
 
     scripts:
-      - name: 🐛 Debug Environment
+      - name: 🔍 Validate Dynamic Variables
         script: |
-          echo "🐛 Debugging iOS build environment..."
-          echo "================================================"
-          
-          # Make the debug script executable
-          chmod +x lib/scripts/ios-workflow/debug_build.sh
-          
-          # Run debug script
-          ./lib/scripts/ios-workflow/debug_build.sh
-          
-          echo "✅ Debug completed"
-          
-      - name: 🔍 Validate Environment
-        script: |
-          echo "🔍 Validating iOS build environment..."
+          echo "🔍 Validating Dynamic Variables from Codemagic API"
           echo "================================================"
           
           # Make the validation script executable
-          chmod +x lib/scripts/ios-workflow/validate_env.sh
+          chmod +x lib/scripts/ios-workflow/validate_dynamic_vars.sh
           
-          # Run environment validation
-          ./lib/scripts/ios-workflow/validate_env.sh
+          # Run dynamic variable validation
+          bash lib/scripts/ios-workflow/validate_dynamic_vars.sh
           
-          echo "✅ Environment validation completed"
+          echo "✅ Dynamic variable validation completed"
           
-      - name: 🚀 New Comprehensive iOS Build Script
+      - name: 🚀 Dynamic iOS Workflow
         script: |
-          echo "🚀 Starting new comprehensive iOS build process..."
+          echo "🚀 Starting Dynamic iOS Workflow"
           echo "================================================"
           
-          # Make the script executable
-          chmod +x lib/scripts/ios-workflow/new_ios_workflow.sh
+          # Make the dynamic workflow script executable
+          chmod +x lib/scripts/ios-workflow/dynamic_ios_workflow.sh
           
-          # Run the new comprehensive iOS build script
-          ./lib/scripts/ios-workflow/new_ios_workflow.sh
+          # Run the dynamic iOS workflow with robust download functionality
+          bash lib/scripts/ios-workflow/dynamic_ios_workflow.sh
           
-          echo "✅ New iOS build process completed"
+          echo "✅ Dynamic iOS workflow completed"
 
     artifacts:
       - build/export/*.ipa
