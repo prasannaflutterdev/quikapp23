@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter/gestures.dart';
-import 'package:voice_assistant/voice_assistant.dart' as va;
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'chat_message.dart';
 import 'chat_service.dart';
 import 'dart:convert';
@@ -28,7 +28,7 @@ class _ChatWidgetState extends State<ChatWidget> {
   late final ChatService _chatService;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final va.VoiceAssistant _speech = va.VoiceAssistant();
+  final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isLoading = false;
   bool _isListening = false;
   bool _showVoiceCard = false;
@@ -103,7 +103,7 @@ class _ChatWidgetState extends State<ChatWidget> {
               });
             },
             localeId: 'en_US',
-            listenMode: va.ListenMode.confirmation,
+            listenMode: stt.ListenMode.confirmation,
           );
         }
       } else {
