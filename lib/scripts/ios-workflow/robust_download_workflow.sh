@@ -519,8 +519,17 @@ fi
 # Update bundle identifier in project.pbxproj
 if [ -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
     log_info "Updating bundle identifier in project.pbxproj..."
-    # Use a safer sed approach with proper escaping
-    sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" ios/Runner.xcodeproj/project.pbxproj || log_warning "Failed to update bundle identifier"
+    # Use a safer approach with plutil instead of sed
+    if command -v plutil >/dev/null 2>&1; then
+        # Try using plutil first (more reliable)
+        plutil -replace PRODUCT_BUNDLE_IDENTIFIER -string "$BUNDLE_ID" ios/Runner.xcodeproj/project.pbxproj 2>/dev/null || {
+            # Fallback to sed with proper escaping
+            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" ios/Runner.xcodeproj/project.pbxproj 2>/dev/null || log_warning "Failed to update bundle identifier"
+        }
+    else
+        # Use sed with proper escaping
+        sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" ios/Runner.xcodeproj/project.pbxproj 2>/dev/null || log_warning "Failed to update bundle identifier"
+    fi
 fi
 
 log_success "App name and bundle ID configured"
@@ -552,8 +561,18 @@ create_dart_string() {
     local var_name="$1"
     local value="$2"
     
+    # Clean the value to remove emoji and non-ASCII characters
+    local clean_value=$(echo "$value" | sed 's/[^\x00-\x7F]//g' | tr -d '\r\n\t')
+    
     # Use printf to properly escape the string
-    printf "  static const String %s = %s;\n" "$var_name" "$(printf '%q' "$value")"
+    printf "  static const String %s = %s;\n" "$var_name" "$(printf '%q' "$clean_value")"
+}
+
+# Function to clean environment variables
+clean_env_var() {
+    local var_value="$1"
+    # Remove emoji and non-ASCII characters, and trim whitespace
+    echo "$var_value" | sed 's/[^\x00-\x7F]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -d '\r\n\t'
 }
 
 # Generate the env_config.dart file using a safer approach
@@ -565,17 +584,17 @@ class EnvConfig {
   // App Information
 EOF
 
-# Add simple string variables
-printf "  static const String appName = %s;\n" "$(printf '%q' "$APP_NAME")" >> lib/config/env_config.dart
-printf "  static const String versionName = %s;\n" "$(printf '%q' "$VERSION_NAME")" >> lib/config/env_config.dart
-printf "  static const String versionCode = %s;\n" "$(printf '%q' "$VERSION_CODE")" >> lib/config/env_config.dart
-printf "  static const String bundleId = %s;\n" "$(printf '%q' "$BUNDLE_ID")" >> lib/config/env_config.dart
-printf "  static const String packageName = %s;\n" "$(printf '%q' "$PKG_NAME")" >> lib/config/env_config.dart
-printf "  static const String organizationName = %s;\n" "$(printf '%q' "$ORG_NAME")" >> lib/config/env_config.dart
-printf "  static const String webUrl = %s;\n" "$(printf '%q' "$WEB_URL")" >> lib/config/env_config.dart
-printf "  static const String userName = %s;\n" "$(printf '%q' "$USER_NAME")" >> lib/config/env_config.dart
-printf "  static const String appId = %s;\n" "$(printf '%q' "$APP_ID")" >> lib/config/env_config.dart
-printf "  static const String workflowId = %s;\n" "$(printf '%q' "$WORKFLOW_ID")" >> lib/config/env_config.dart
+# Add simple string variables with cleaned values
+printf "  static const String appName = %s;\n" "$(printf '%q' "$(clean_env_var "$APP_NAME")")" >> lib/config/env_config.dart
+printf "  static const String versionName = %s;\n" "$(printf '%q' "$(clean_env_var "$VERSION_NAME")")" >> lib/config/env_config.dart
+printf "  static const String versionCode = %s;\n" "$(printf '%q' "$(clean_env_var "$VERSION_CODE")")" >> lib/config/env_config.dart
+printf "  static const String bundleId = %s;\n" "$(printf '%q' "$(clean_env_var "$BUNDLE_ID")")" >> lib/config/env_config.dart
+printf "  static const String packageName = %s;\n" "$(printf '%q' "$(clean_env_var "$PKG_NAME")")" >> lib/config/env_config.dart
+printf "  static const String organizationName = %s;\n" "$(printf '%q' "$(clean_env_var "$ORG_NAME")")" >> lib/config/env_config.dart
+printf "  static const String webUrl = %s;\n" "$(printf '%q' "$(clean_env_var "$WEB_URL")")" >> lib/config/env_config.dart
+printf "  static const String userName = %s;\n" "$(printf '%q' "$(clean_env_var "$USER_NAME")")" >> lib/config/env_config.dart
+printf "  static const String appId = %s;\n" "$(printf '%q' "$(clean_env_var "$APP_ID")")" >> lib/config/env_config.dart
+printf "  static const String workflowId = %s;\n" "$(printf '%q' "$(clean_env_var "$WORKFLOW_ID")")" >> lib/config/env_config.dart
 
 # Add boolean variables
 cat >> lib/config/env_config.dart <<EOF
@@ -602,12 +621,12 @@ cat >> lib/config/env_config.dart <<EOF
   // UI Configuration
 EOF
 
-# Add complex string variables using printf
-printf "  static const String splashBgColor = %s;\n" "$(printf '%q' "$SPLASH_BG_COLOR")" >> lib/config/env_config.dart
-printf "  static const String splashTagline = %s;\n" "$(printf '%q' "$SPLASH_TAGLINE")" >> lib/config/env_config.dart
-printf "  static const String splashTaglineColor = %s;\n" "$(printf '%q' "$SPLASH_TAGLINE_COLOR")" >> lib/config/env_config.dart
-printf "  static const String splashAnimation = %s;\n" "$(printf '%q' "$SPLASH_ANIMATION")" >> lib/config/env_config.dart
-printf "  static const String splashDuration = %s;\n" "$(printf '%q' "$SPLASH_DURATION")" >> lib/config/env_config.dart
+# Add complex string variables using printf with cleaned values
+printf "  static const String splashBgColor = %s;\n" "$(printf '%q' "$(clean_env_var "$SPLASH_BG_COLOR")")" >> lib/config/env_config.dart
+printf "  static const String splashTagline = %s;\n" "$(printf '%q' "$(clean_env_var "$SPLASH_TAGLINE")")" >> lib/config/env_config.dart
+printf "  static const String splashTaglineColor = %s;\n" "$(printf '%q' "$(clean_env_var "$SPLASH_TAGLINE_COLOR")")" >> lib/config/env_config.dart
+printf "  static const String splashAnimation = %s;\n" "$(printf '%q' "$(clean_env_var "$SPLASH_ANIMATION")")" >> lib/config/env_config.dart
+printf "  static const String splashDuration = %s;\n" "$(printf '%q' "$(clean_env_var "$SPLASH_DURATION")")" >> lib/config/env_config.dart
 
 # Add bottom menu configuration
 cat >> lib/config/env_config.dart <<EOF
@@ -615,20 +634,20 @@ cat >> lib/config/env_config.dart <<EOF
   // Bottom Menu Configuration
 EOF
 
-printf "  static const String bottomMenuItems = %s;\n" "$(printf '%q' "$BOTTOMMENU_ITEMS")" >> lib/config/env_config.dart
-printf "  static const String bottomMenuBgColor = %s;\n" "$(printf '%q' "$BOTTOMMENU_BG_COLOR")" >> lib/config/env_config.dart
-printf "  static const String bottomMenuIconColor = %s;\n" "$(printf '%q' "$BOTTOMMENU_ICON_COLOR")" >> lib/config/env_config.dart
-printf "  static const String bottomMenuTextColor = %s;\n" "$(printf '%q' "$BOTTOMMENU_TEXT_COLOR")" >> lib/config/env_config.dart
-printf "  static const String bottomMenuFont = %s;\n" "$(printf '%q' "$BOTTOMMENU_FONT")" >> lib/config/env_config.dart
-printf "  static const String bottomMenuFontSize = %s;\n" "$(printf '%q' "$BOTTOMMENU_FONT_SIZE")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuItems = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_ITEMS")")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuBgColor = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_BG_COLOR")")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuIconColor = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_ICON_COLOR")")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuTextColor = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_TEXT_COLOR")")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuFont = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_FONT")")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuFontSize = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_FONT_SIZE")")" >> lib/config/env_config.dart
 
 cat >> lib/config/env_config.dart <<EOF
   static const bool bottomMenuFontBold = $BOTTOMMENU_FONT_BOLD;
   static const bool bottomMenuFontItalic = $BOTTOMMENU_FONT_ITALIC;
 EOF
 
-printf "  static const String bottomMenuActiveTabColor = %s;\n" "$(printf '%q' "$BOTTOMMENU_ACTIVE_TAB_COLOR")" >> lib/config/env_config.dart
-printf "  static const String bottomMenuIconPosition = %s;\n" "$(printf '%q' "$BOTTOMMENU_ICON_POSITION")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuActiveTabColor = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_ACTIVE_TAB_COLOR")")" >> lib/config/env_config.dart
+printf "  static const String bottomMenuIconPosition = %s;\n" "$(printf '%q' "$(clean_env_var "$BOTTOMMENU_ICON_POSITION")")" >> lib/config/env_config.dart
 
 cat >> lib/config/env_config.dart <<EOF
 }
