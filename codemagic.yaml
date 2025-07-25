@@ -395,45 +395,20 @@ workflows:
         CERT_P12_URL: $CERT_P12_URL
         CERT_CER_URL: $CERT_CER_URL
         CERT_KEY_URL: $CERT_KEY_URL
-      xcode: latest
-      cocoapods: default
-      flutter: stable
-      groups:
-        - app_store_credentials
-        - firebase_credentials
-        - email_credentials
-
+      xcode: 16.0
+      cocoapods: 1.16.2
+      flutter: 3.32.2
+      java: 17
     cache:
       cache_paths:
         - "$HOME/Library/Caches/CocoaPods"
 
     scripts:
-      - name: 🔍 Validate Dynamic Variables
+      - name: 🚀 Simple Robust iOS Workflow
         script: |
-          echo "🔍 Validating Dynamic Variables from Codemagic API"
-          echo "================================================"
-          
-          # Make the validation script executable
-          chmod +x lib/scripts/ios-workflow/validate_dynamic_vars.sh
-          
-          # Run dynamic variable validation
-          bash lib/scripts/ios-workflow/validate_dynamic_vars.sh
-          
-          echo "✅ Dynamic variable validation completed"
-          
-      - name: 🚀 Dynamic iOS Workflow
-        script: |
-          echo "🚀 Starting Dynamic iOS Workflow"
-          echo "================================================"
-          
-          # Make the dynamic workflow script executable
-          chmod +x lib/scripts/ios-workflow/dynamic_ios_workflow.sh
-          
-          # Run the dynamic iOS workflow with robust download functionality
-          bash lib/scripts/ios-workflow/dynamic_ios_workflow.sh
-          
-          echo "✅ Dynamic iOS workflow completed"
-
+          chmod +x lib/scripts/ios-workflow/simple_robust_ios_workflow.sh
+          bash lib/scripts/ios-workflow/simple_robust_ios_workflow.sh
+  
     artifacts:
       - build/export/*.ipa
       - output/ios/*.ipa
