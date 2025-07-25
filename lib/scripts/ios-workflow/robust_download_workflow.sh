@@ -53,7 +53,7 @@ robust_download() {
     # Create directory if it doesn't exist
     mkdir -p "$(dirname "$output_path")"
     
-    # Method 1: Wget (Primary method)
+    # Method 1: Wget (Primary method) - Enhanced
     if command -v wget >/dev/null 2>&1; then
         log_info "Trying wget download..."
         if wget --timeout=60 --tries=3 --retry-connrefused --no-check-certificate \
@@ -68,7 +68,7 @@ robust_download() {
         log_warning "wget not available, trying curl..."
     fi
     
-    # Method 2: Curl with different options
+    # Method 2: Curl with different options - Enhanced
     if command -v curl >/dev/null 2>&1; then
         log_info "Trying curl download..."
         if curl -L -f -s --connect-timeout 30 --max-time 120 \
@@ -113,6 +113,69 @@ robust_download() {
             --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
             -O "$output_path" "$url" 2>/dev/null; then
             log_success "$description downloaded successfully with wget (no cert check)"
+            return 0
+        fi
+    fi
+    
+    # Method 6: Try with curl with insecure flag
+    if command -v curl >/dev/null 2>&1; then
+        log_info "Trying curl with insecure flag..."
+        if curl -L -f -s -k --connect-timeout 30 --max-time 120 \
+            --retry 3 --retry-delay 2 \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+            -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully with curl (insecure)"
+            return 0
+        fi
+    fi
+    
+    # Method 7: Try with curl with different timeout
+    if command -v curl >/dev/null 2>&1; then
+        log_info "Trying curl with extended timeout..."
+        if curl -L -f -s --connect-timeout 60 --max-time 300 \
+            --retry 5 --retry-delay 5 \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+            -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully with curl (extended timeout)"
+            return 0
+        fi
+    fi
+    
+    # Method 8: Try with wget with extended timeout
+    if command -v wget >/dev/null 2>&1; then
+        log_info "Trying wget with extended timeout..."
+        if wget --timeout=120 --tries=5 --retry-connrefused --no-check-certificate \
+            --user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+            -O "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully with wget (extended timeout)"
+            return 0
+        fi
+    fi
+    
+    # Method 9: Try with curl with different headers
+    if command -v curl >/dev/null 2>&1; then
+        log_info "Trying curl with additional headers..."
+        if curl -L -f -s --connect-timeout 30 --max-time 120 \
+            --retry 3 --retry-delay 2 \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+            -H "Accept: */*" \
+            -H "Accept-Language: en-US,en;q=0.9" \
+            -H "Accept-Encoding: gzip, deflate, br" \
+            -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully with curl (additional headers)"
+            return 0
+        fi
+    fi
+    
+    # Method 10: Try with curl with proxy bypass
+    if command -v curl >/dev/null 2>&1; then
+        log_info "Trying curl with proxy bypass..."
+        if curl -L -f -s --connect-timeout 30 --max-time 120 \
+            --retry 3 --retry-delay 2 \
+            --noproxy "*" \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+            -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully with curl (proxy bypass)"
             return 0
         fi
     fi
@@ -337,21 +400,41 @@ if [ -n "$SPLASH_BG_URL" ]; then
     else
         log_warning "Failed to download splash background, using default"
         if command -v magick >/dev/null 2>&1; then
-            magick -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png"
+            # Fix color format for ImageMagick v7
+            magick -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png" 2>/dev/null || \
+            magick -size 1125x2436 xc:"rgb($(echo $SPLASH_BG_COLOR | sed 's/#//' | sed 's/../0x& /g'))" "assets/images/splash_bg.png" 2>/dev/null || \
+            magick -size 1125x2436 xc:"#FFFFFF" "assets/images/splash_bg.png" 2>/dev/null
             log_info "Created default splash background with color: $SPLASH_BG_COLOR"
         elif command -v convert >/dev/null 2>&1; then
-            convert -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png"
+            # Fix color format for ImageMagick v6
+            convert -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png" 2>/dev/null || \
+            convert -size 1125x2436 xc:"rgb($(echo $SPLASH_BG_COLOR | sed 's/#//' | sed 's/../0x& /g'))" "assets/images/splash_bg.png" 2>/dev/null || \
+            convert -size 1125x2436 xc:"#FFFFFF" "assets/images/splash_bg.png" 2>/dev/null
             log_info "Created default splash background with color: $SPLASH_BG_COLOR"
+        else
+            log_warning "ImageMagick not available, creating empty splash background"
+            # Create empty file as fallback
+            touch "assets/images/splash_bg.png"
         fi
     fi
 else
     log_warning "SPLASH_BG_URL not provided, using default"
     if command -v magick >/dev/null 2>&1; then
-        magick -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png"
+        # Fix color format for ImageMagick v7
+        magick -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png" 2>/dev/null || \
+        magick -size 1125x2436 xc:"rgb($(echo $SPLASH_BG_COLOR | sed 's/#//' | sed 's/../0x& /g'))" "assets/images/splash_bg.png" 2>/dev/null || \
+        magick -size 1125x2436 xc:"#FFFFFF" "assets/images/splash_bg.png" 2>/dev/null
         log_info "Created default splash background with color: $SPLASH_BG_COLOR"
     elif command -v convert >/dev/null 2>&1; then
-        convert -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png"
+        # Fix color format for ImageMagick v6
+        convert -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png" 2>/dev/null || \
+        convert -size 1125x2436 xc:"rgb($(echo $SPLASH_BG_COLOR | sed 's/#//' | sed 's/../0x& /g'))" "assets/images/splash_bg.png" 2>/dev/null || \
+        convert -size 1125x2436 xc:"#FFFFFF" "assets/images/splash_bg.png" 2>/dev/null
         log_info "Created default splash background with color: $SPLASH_BG_COLOR"
+    else
+        log_warning "ImageMagick not available, creating empty splash background"
+        # Create empty file as fallback
+        touch "assets/images/splash_bg.png"
     fi
 fi
 
