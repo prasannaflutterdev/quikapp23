@@ -404,16 +404,29 @@ workflows:
         - "$HOME/Library/Caches/CocoaPods"
 
     scripts:
+      - name: 🔍 Validate Environment
+        script: |
+          echo "🔍 Validating iOS build environment..."
+          echo "================================================"
+          
+          # Make the validation script executable
+          chmod +x lib/scripts/ios-workflow/validate_env.sh
+          
+          # Run environment validation
+          ./lib/scripts/ios-workflow/validate_env.sh
+          
+          echo "✅ Environment validation completed"
+          
       - name: 🚀 Single iOS Build Script
         script: |
           echo "🚀 Starting unified iOS build process..."
           echo "================================================"
           
           # Make the script executable
-          chmod +x lib/scripts/ios-workflow/build_ios.sh
+          chmod +x lib/scripts/ios-workflow/build_ios_simple.sh
           
-          # Run the unified iOS build script
-          ./lib/scripts/ios-workflow/build_ios.sh
+          # Run the simplified iOS build script
+          ./lib/scripts/ios-workflow/build_ios_simple.sh
           
           echo "✅ iOS build process completed"
 

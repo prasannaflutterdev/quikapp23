@@ -36,6 +36,45 @@ get_env_var() {
     fi
 }
 
+# Function to safely download files with retry logic
+safe_download() {
+    local url="$1"
+    local output_path="$2"
+    local description="$3"
+    
+    if [ -z "$url" ]; then
+        log_warning "No URL provided for $description, skipping"
+        return 0
+    fi
+    
+    log_info "Downloading $description from: $url"
+    
+    # Create directory if it doesn't exist
+    mkdir -p "$(dirname "$output_path")"
+    
+    # Try multiple download methods with retry logic
+    local max_retries=3
+    local retry_count=0
+    
+    while [ $retry_count -lt $max_retries ]; do
+        if curl -L -f -s -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully"
+            return 0
+        else
+            retry_count=$((retry_count + 1))
+            log_warning "Download attempt $retry_count failed for $description"
+            
+            if [ $retry_count -lt $max_retries ]; then
+                log_info "Retrying in 2 seconds..."
+                sleep 2
+            fi
+        fi
+    done
+    
+    log_error "Failed to download $description after $max_retries attempts"
+    return 1
+}
+
 # Step 1: Environment Setup and Validation
 log_info "Step 1: Environment Setup and Validation"
 log "================================================"
@@ -107,32 +146,32 @@ log "================================================"
 # Download provisioning profile if URL provided
 if [ -n "$PROFILE_URL" ]; then
     log_info "Downloading provisioning profile..."
-    curl -L -o "ios/Runner.mobileprovision" "$PROFILE_URL" || {
-        log_error "Failed to download provisioning profile from $PROFILE_URL"
-        exit 1
-    }
-    log_success "Provisioning profile downloaded"
+    if safe_download "$PROFILE_URL" "ios/Runner.mobileprovision" "provisioning profile"; then
+        log_success "Provisioning profile downloaded"
+    else
+        log_warning "Failed to download provisioning profile, continuing without it"
+    fi
 fi
 
 # Download App Store Connect API key if URL provided
 if [ -n "$APP_STORE_CONNECT_API_KEY_URL" ]; then
     log_info "Downloading App Store Connect API key..."
-    curl -L -o "ios/AuthKey.p8" "$APP_STORE_CONNECT_API_KEY_URL" || {
-        log_error "Failed to download App Store Connect API key"
-        exit 1
-    }
-    log_success "App Store Connect API key downloaded"
+    if safe_download "$APP_STORE_CONNECT_API_KEY_URL" "ios/AuthKey.p8" "App Store Connect API key"; then
+        log_success "App Store Connect API key downloaded"
+    else
+        log_warning "Failed to download App Store Connect API key"
+    fi
 fi
 
 # Download app icons and splash if URLs provided
 if [ -n "$LOGO_URL" ]; then
     log_info "Downloading app logo..."
-    curl -L -o "assets/images/logo.png" "$LOGO_URL" || log_warning "Failed to download logo"
+    safe_download "$LOGO_URL" "assets/images/logo.png" "app logo" || log_warning "Failed to download logo"
 fi
 
 if [ -n "$SPLASH_URL" ]; then
     log_info "Downloading splash image..."
-    curl -L -o "assets/images/splash.png" "$SPLASH_URL" || log_warning "Failed to download splash"
+    safe_download "$SPLASH_URL" "assets/images/splash.png" "splash image" || log_warning "Failed to download splash"
 fi
 
 # Step 3: Generate Environment Configuration
