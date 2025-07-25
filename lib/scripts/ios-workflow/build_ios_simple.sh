@@ -52,14 +52,40 @@ safe_download() {
     # Create directory if it doesn't exist
     mkdir -p "$(dirname "$output_path")"
     
-    # Use curl with proper error handling
-    if curl -L -f -s -o "$output_path" "$url" 2>/dev/null; then
-        log_success "$description downloaded successfully"
-        return 0
-    else
-        log_warning "Failed to download $description, continuing without it"
-        return 1
-    fi
+    # Try multiple download methods with retry logic
+    local max_retries=3
+    local retry_count=0
+    
+    while [ $retry_count -lt $max_retries ]; do
+        # Method 1: Standard curl download
+        if curl -L -f -s -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully"
+            return 0
+        fi
+        
+        # Method 2: Try with different user agent
+        if curl -L -f -s -o "$output_path" -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully (with custom user agent)"
+            return 0
+        fi
+        
+        # Method 3: Try without -L flag (for some redirect issues)
+        if curl -f -s -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully (without redirect)"
+            return 0
+        fi
+        
+        retry_count=$((retry_count + 1))
+        log_warning "Download attempt $retry_count failed for $description"
+        
+        if [ $retry_count -lt $max_retries ]; then
+            log_info "Retrying in 2 seconds..."
+            sleep 2
+        fi
+    done
+    
+    log_error "Failed to download $description after $max_retries attempts"
+    return 1
 }
 
 # Step 1: Environment Setup
@@ -151,10 +177,17 @@ fi
 # Install CocoaPods dependencies
 log_info "Installing CocoaPods dependencies..."
 cd ios
-pod install --repo-update || {
-    log_error "Failed to install CocoaPods dependencies"
-    exit 1
-}
+if pod install --repo-update; then
+    log_success "CocoaPods dependencies installed successfully"
+else
+    log_warning "CocoaPods install failed, trying without --repo-update..."
+    if pod install; then
+        log_success "CocoaPods dependencies installed successfully (without repo update)"
+    else
+        log_error "CocoaPods install failed completely"
+        log_warning "Continuing anyway - this might cause build issues"
+    fi
+fi
 cd ..
 
 log_success "iOS setup completed"
@@ -164,19 +197,23 @@ log_info "Step 6: Flutter Build"
 log "================================================"
 
 log_info "Building Flutter app without code signing..."
-flutter build ios --release --no-codesign || {
+if flutter build ios --release --no-codesign; then
+    log_success "Flutter build completed successfully"
+else
     log_error "Flutter build failed"
-    exit 1
-}
-
-log_success "Flutter build completed"
+    log_warning "Trying with verbose output for debugging..."
+    flutter build ios --release --no-codesign --verbose || {
+        log_error "Flutter build failed even with verbose output"
+        exit 1
+    }
+fi
 
 # Step 7: Xcode Archive
 log_info "Step 7: Xcode Archive"
 log "================================================"
 
 log_info "Creating Xcode archive with code signing..."
-xcodebuild -workspace ios/Runner.xcworkspace \
+if xcodebuild -workspace ios/Runner.xcworkspace \
     -scheme Runner \
     -sdk iphoneos \
     -configuration Release archive \
@@ -185,12 +222,25 @@ xcodebuild -workspace ios/Runner.xcworkspace \
     PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
     CODE_SIGN_STYLE="Automatic" \
     CODE_SIGN_IDENTITY="iPhone Distribution" \
-    PROVISIONING_PROFILE_SPECIFIER="Runner" || {
+    PROVISIONING_PROFILE_SPECIFIER="Runner"; then
+    log_success "Xcode archive completed successfully"
+else
     log_error "Xcode archive failed"
-    exit 1
-}
-
-log_success "Xcode archive completed"
+    log_warning "Trying with different code signing settings..."
+    if xcodebuild -workspace ios/Runner.xcworkspace \
+        -scheme Runner \
+        -sdk iphoneos \
+        -configuration Release archive \
+        -archivePath build/Runner.xcarchive \
+        DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+        PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+        CODE_SIGN_STYLE="Automatic"; then
+        log_success "Xcode archive completed successfully (with simplified signing)"
+    else
+        log_error "Xcode archive failed completely"
+        exit 1
+    fi
+fi
 
 # Step 8: Export IPA
 log_info "Step 8: Export IPA"
@@ -220,14 +270,25 @@ cat > lib/scripts/ios-workflow/exportOptions.plist <<EOF
 EOF
 
 log_info "Exporting IPA..."
-xcodebuild -exportArchive \
+if xcodebuild -exportArchive \
     -archivePath build/Runner.xcarchive \
     -exportOptionsPlist lib/scripts/ios-workflow/exportOptions.plist \
     -exportPath build/export \
-    -allowProvisioningUpdates || {
+    -allowProvisioningUpdates; then
+    log_success "IPA export completed successfully"
+else
     log_error "IPA export failed"
-    exit 1
-}
+    log_warning "Trying with different export options..."
+    if xcodebuild -exportArchive \
+        -archivePath build/Runner.xcarchive \
+        -exportOptionsPlist lib/scripts/ios-workflow/exportOptions.plist \
+        -exportPath build/export; then
+        log_success "IPA export completed successfully (without provisioning updates)"
+    else
+        log_error "IPA export failed completely"
+        exit 1
+    fi
+fi
 
 # Verify IPA was created
 if [ -f "build/export/Runner.ipa" ]; then

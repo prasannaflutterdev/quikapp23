@@ -57,17 +57,30 @@ safe_download() {
     local retry_count=0
     
     while [ $retry_count -lt $max_retries ]; do
+        # Method 1: Standard curl download
         if curl -L -f -s -o "$output_path" "$url" 2>/dev/null; then
             log_success "$description downloaded successfully"
             return 0
-        else
-            retry_count=$((retry_count + 1))
-            log_warning "Download attempt $retry_count failed for $description"
-            
-            if [ $retry_count -lt $max_retries ]; then
-                log_info "Retrying in 2 seconds..."
-                sleep 2
-            fi
+        fi
+        
+        # Method 2: Try with different user agent
+        if curl -L -f -s -o "$output_path" -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully (with custom user agent)"
+            return 0
+        fi
+        
+        # Method 3: Try without -L flag (for some redirect issues)
+        if curl -f -s -o "$output_path" "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully (without redirect)"
+            return 0
+        fi
+        
+        retry_count=$((retry_count + 1))
+        log_warning "Download attempt $retry_count failed for $description"
+        
+        if [ $retry_count -lt $max_retries ]; then
+            log_info "Retrying in 2 seconds..."
+            sleep 2
         fi
     done
     

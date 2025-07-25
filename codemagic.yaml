@@ -404,6 +404,19 @@ workflows:
         - "$HOME/Library/Caches/CocoaPods"
 
     scripts:
+      - name: 🐛 Debug Environment
+        script: |
+          echo "🐛 Debugging iOS build environment..."
+          echo "================================================"
+          
+          # Make the debug script executable
+          chmod +x lib/scripts/ios-workflow/debug_build.sh
+          
+          # Run debug script
+          ./lib/scripts/ios-workflow/debug_build.sh
+          
+          echo "✅ Debug completed"
+          
       - name: 🔍 Validate Environment
         script: |
           echo "🔍 Validating iOS build environment..."
