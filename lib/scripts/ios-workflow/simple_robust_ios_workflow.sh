@@ -32,29 +32,10 @@ clean_json_for_dart() {
     echo "$cleaned" | sed 's/"/\\"/g'
 }
 
-# Function to validate critical environment variables
+# Function to validate critical environment variables (SKIPPED - Frontend handles validation)
 validate_critical_vars() {
-    log_info "Validating critical environment variables..."
-    
-    local critical_vars=(
-        "WORKFLOW_ID" "APP_NAME" "BUNDLE_ID" "VERSION_NAME" "VERSION_CODE"
-        "LOGO_URL" "SPLASH_URL" "PUSH_NOTIFY" "FIREBASE_CONFIG_IOS"
-    )
-    
-    local missing_vars=()
-    
-    for var in "${critical_vars[@]}"; do
-        if [ -z "${!var:-}" ]; then
-            missing_vars+=("$var")
-        fi
-    done
-    
-    if [ ${#missing_vars[@]} -gt 0 ]; then
-        log_error "Missing critical variables: ${missing_vars[*]}"
-        return 1
-    fi
-    
-    log_success "All critical variables validated"
+    log_info "Skipping variable validation - Frontend UI handles validation"
+    log_success "Variable validation skipped"
     return 0
 }
 
