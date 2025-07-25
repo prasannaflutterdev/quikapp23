@@ -385,8 +385,8 @@ workflows:
         BOTTOMMENU_ICON_POSITION: $BOTTOMMENU_ICON_POSITION
         
         # Firebase & APNS
-        FIREBASE_CONFIG_ANDROID: $FIREBASE_CONFIG_ANDROID
-        FIREBASE_CONFIG_IOS: $FIREBASE_CONFIG_IOS
+        FIREBASE_CONFIG_ANDROID: "${FIREBASE_CONFIG_ANDROID:-}"
+        FIREBASE_CONFIG_IOS: "${FIREBASE_CONFIG_IOS:-}"
         APNS_KEY_ID: $APNS_KEY_ID
         APNS_AUTH_KEY_URL: $APNS_AUTH_KEY_URL
         
@@ -408,7 +408,7 @@ workflows:
         script: |
           chmod +x lib/scripts/ios-workflow/minimal_ios_workflow.sh
           bash lib/scripts/ios-workflow/minimal_ios_workflow.sh
-  
+
     artifacts:
       - build/export/*.ipa
       - output/ios/*.ipa
