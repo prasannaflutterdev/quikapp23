@@ -334,9 +334,6 @@ class EnvConfig {
   static const String appName = "${APP_NAME:-QuikApp}";
   static const String orgName = "${ORG_NAME:-}";
   static const String webUrl = "${WEB_URL:-}";
-  static const String userName = "${USER_NAME:-}";
-  static const String emailId = "${EMAIL_ID:-}";
-  static const String branch = "main";
 
   // Package Identifiers
 $(if [ "$IS_IOS_WORKFLOW" = true ]; then
@@ -411,18 +408,6 @@ fi)
   // Firebase Configuration
   static const String firebaseConfigAndroid = "${FIREBASE_CONFIG_ANDROID:-}";
   static const String firebaseConfigIos = "${FIREBASE_CONFIG_IOS:-}";
-
-  // Email Configuration
-  static const String emailSmtpServer = "${EMAIL_SMTP_SERVER:-}";
-  static const int emailSmtpPort = ${EMAIL_SMTP_PORT:-587};
-  static const String emailSmtpUser = "${EMAIL_SMTP_USER:-}";
-  static const bool enableEmailNotifications = ${ENABLE_EMAIL_NOTIFICATIONS:-false};
-
-  // Build Information
-  static const String buildId = "${CM_BUILD_ID:-${FCI_BUILD_ID:-unknown}}";
-  static const String projectId = "${CM_PROJECT_ID:-${FCI_PROJECT_ID:-unknown}}";
-  static const String workflowName = "${CM_WORKFLOW_NAME:-${FCI_WORKFLOW_NAME:-unknown}}";
-  static const int buildNumber = ${BUILD_NUMBER:-${PROJECT_BUILD_NUMBER:-0}};
 }
 EOF
 
