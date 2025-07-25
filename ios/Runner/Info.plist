@@ -7,8 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>[2025-07-25 16:00:24] [ENHANCED_IOS] ✅ Found APP_NAME: Test App
-Test App</string>
+	<string>Test App</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -16,8 +15,7 @@ Test App</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>[2025-07-25 16:00:24] [ENHANCED_IOS] ✅ Found APP_NAME: Test App
-Test App</string>
+	<string>Test App</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

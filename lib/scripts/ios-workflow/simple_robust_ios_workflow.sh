@@ -404,13 +404,13 @@ EOF
     cat >> lib/config/env_config.dart <<EOF
 
   // Feature Flags
-  static const bool isPushNotify = ${PUSH_NOTIFY:-false};
+  static const bool pushNotify = ${PUSH_NOTIFY:-false};
   static const bool isChatbot = ${IS_CHATBOT:-false};
   static const bool isDomainUrl = ${IS_DOMAIN_URL:-false};
   static const bool isSplash = ${IS_SPLASH:-true};
   static const bool isPulldown = ${IS_PULLDOWN:-false};
-  static const bool isBottomMenu = ${IS_BOTTOMMENU:-false};
-  static const bool isLoadInd = ${IS_LOAD_IND:-false};
+  static const bool isBottommenu = ${IS_BOTTOMMENU:-false};
+  static const bool isLoadIndicator = ${IS_LOAD_IND:-false};
 
   // Permissions
   static const bool isCamera = ${IS_CAMERA:-false};
@@ -431,6 +431,10 @@ EOF
     printf "  static const String splashTaglineColor = \"%s\";\n" "$(clean_env_var "${SPLASH_TAGLINE_COLOR:-#000000}")" >> lib/config/env_config.dart
     printf "  static const String splashAnimation = \"%s\";\n" "$(clean_env_var "${SPLASH_ANIMATION:-fade}")" >> lib/config/env_config.dart
     printf "  static const String splashDuration = \"%s\";\n" "$(clean_env_var "${SPLASH_DURATION:-3}")" >> lib/config/env_config.dart
+
+    # Add missing properties that are used in main.dart
+    printf "  static const String splashUrl = \"%s\";\n" "$(clean_env_var "${SPLASH_URL:-}")" >> lib/config/env_config.dart
+    printf "  static const String splashBg = \"%s\";\n" "$(clean_env_var "${SPLASH_BG_URL:-}")" >> lib/config/env_config.dart
 
     # Add bottom menu configuration
     cat >> lib/config/env_config.dart <<EOF
@@ -456,6 +460,14 @@ EOF
 
     printf "  static const String bottomMenuActiveTabColor = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_ACTIVE_TAB_COLOR:-#007AFF}")" >> lib/config/env_config.dart
     printf "  static const String bottomMenuIconPosition = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_ICON_POSITION:-above}")" >> lib/config/env_config.dart
+
+    # Add missing properties with different names used in main.dart
+    printf "  static const String bottommenuItems = \"%s\";\n" "$cleaned_json" >> lib/config/env_config.dart
+    printf "  static const String bottommenuBgColor = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_BG_COLOR:-#FFFFFF}")" >> lib/config/env_config.dart
+    printf "  static const String bottommenuActiveTabColor = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_ACTIVE_TAB_COLOR:-#007AFF}")" >> lib/config/env_config.dart
+    printf "  static const String bottommenuTextColor = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_TEXT_COLOR:-#666666}")" >> lib/config/env_config.dart
+    printf "  static const String bottommenuIconColor = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_ICON_COLOR:-#666666}")" >> lib/config/env_config.dart
+    printf "  static const String bottommenuIconPosition = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_ICON_POSITION:-above}")" >> lib/config/env_config.dart
 
     cat >> lib/config/env_config.dart <<EOF
 }
