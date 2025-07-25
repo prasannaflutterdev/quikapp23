@@ -1,12 +1,11 @@
 #!/bin/bash
-# 🍎 New iOS Workflow Script for Codemagic
-# Comprehensive iOS build with all features: assets, certificates, firebase, permissions, email notifications
-# Usage: ./lib/scripts/ios-workflow/new_ios_workflow.sh
+# 🍎 Improved iOS Workflow Script for Codemagic
+# Comprehensive iOS build with improved reliability and fallback options
 
 set -euo pipefail
 
 # Enhanced logging
-log() { echo "[$(date +'%Y-%m-%d %H:%M:%S')] [NEW_IOS] $1"; }
+log() { echo "[$(date +'%Y-%m-%d %H:%M:%S')] [IMPROVED_IOS] $1"; }
 log_success() { echo -e "\033[0;32m✅ $1\033[0m"; }
 log_warning() { echo -e "\033[1;33m⚠️ $1\033[0m"; }
 log_error() { echo -e "\033[0;31m❌ $1\033[0m"; }
@@ -38,8 +37,8 @@ get_env_var() {
     fi
 }
 
-# Function to safely download files with retry logic
-safe_download() {
+# Improved download function with better error handling
+improved_download() {
     local url="$1"
     local output_path="$2"
     local description="$3"
@@ -54,30 +53,36 @@ safe_download() {
     # Create directory if it doesn't exist
     mkdir -p "$(dirname "$output_path")"
     
-    # Try multiple download methods with retry logic
+    # Try multiple download methods with exponential backoff
     local max_retries=3
     local retry_count=0
+    local base_delay=2
     
     while [ $retry_count -lt $max_retries ]; do
-        # Method 1: Standard curl download with timeout
+        local delay=$((base_delay * (2 ** retry_count)))
+        
+        # Method 1: Standard curl with longer timeout (working method from test)
         if curl -L -f -s --connect-timeout 30 --max-time 120 -o "$output_path" "$url" 2>/dev/null; then
             log_success "$description downloaded successfully"
             return 0
         fi
         
-        # Method 2: Try with different user agent and longer timeout
-        if curl -L -f -s --connect-timeout 60 --max-time 180 -o "$output_path" -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" "$url" 2>/dev/null; then
-            log_success "$description downloaded successfully (with custom user agent)"
+        # Method 2: Curl with custom user agent
+        if curl -L -f -s --connect-timeout 60 --max-time 180 -o "$output_path" \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+            -H "Accept: */*" \
+            "$url" 2>/dev/null; then
+            log_success "$description downloaded successfully (with custom headers)"
             return 0
         fi
         
-        # Method 3: Try without -L flag (for some redirect issues)
+        # Method 3: Try without redirect
         if curl -f -s --connect-timeout 30 --max-time 120 -o "$output_path" "$url" 2>/dev/null; then
             log_success "$description downloaded successfully (without redirect)"
             return 0
         fi
         
-        # Method 4: Try with wget if available
+        # Method 4: Wget if available
         if command -v wget >/dev/null 2>&1; then
             if wget --timeout=60 --tries=3 -O "$output_path" "$url" 2>/dev/null; then
                 log_success "$description downloaded successfully (with wget)"
@@ -89,13 +94,40 @@ safe_download() {
         log_warning "Download attempt $retry_count failed for $description"
         
         if [ $retry_count -lt $max_retries ]; then
-            log_info "Retrying in 5 seconds..."
-            sleep 5
+            log_info "Retrying in $delay seconds..."
+            sleep $delay
         fi
     done
     
     log_error "Failed to download $description after $max_retries attempts"
     return 1
+}
+
+# Function to create default assets
+create_default_assets() {
+    log_info "Creating default assets..."
+    
+    # Create default logo if missing
+    if [ ! -f "assets/images/default_logo.png" ]; then
+        log_info "Creating default logo..."
+        if command -v convert >/dev/null 2>&1; then
+            convert -size 512x512 xc:"#007AFF" -fill white -draw "text 256,256 'Q'" assets/images/default_logo.png
+            log_success "Default logo created"
+        else
+            log_warning "ImageMagick not available, cannot create default logo"
+        fi
+    fi
+    
+    # Create default splash if missing
+    if [ ! -f "assets/images/splash.png" ]; then
+        log_info "Creating default splash..."
+        if command -v convert >/dev/null 2>&1; then
+            convert -size 1125x2436 xc:"#FFFFFF" -fill "#007AFF" -draw "text 562,1218 'QuikApp'" assets/images/splash.png
+            log_success "Default splash created"
+        else
+            log_warning "ImageMagick not available, cannot create default splash"
+        fi
+    fi
 }
 
 # Function to generate p12 from cer and key files
@@ -108,8 +140,8 @@ generate_p12_from_cer_key() {
     log_info "Generating p12 from cer and key files..."
     
     # Download cer and key files
-    if safe_download "$cer_url" "/tmp/certificate.cer" "certificate file" && \
-       safe_download "$key_url" "/tmp/private.key" "private key file"; then
+    if improved_download "$cer_url" "/tmp/certificate.cer" "certificate file" && \
+       improved_download "$key_url" "/tmp/private.key" "private key file"; then
         
         # Convert to p12
         if openssl pkcs12 -export -in /tmp/certificate.cer -inkey /tmp/private.key -out "$output_path" -passout pass:"$password" 2>/dev/null; then
@@ -124,61 +156,6 @@ generate_p12_from_cer_key() {
         return 1
     fi
 }
-
-# Function to send email notification
-send_email_notification() {
-    local status="$1"
-    local subject="$2"
-    local message="$3"
-    
-    if [ "$ENABLE_EMAIL_NOTIFICATIONS" = "true" ] && [ -n "$EMAIL_ID" ]; then
-        log_info "Sending email notification: $status"
-        
-        # Create email content
-        local email_content="
-iOS Build Status: $status
-
-App Information:
-- Name: $APP_NAME
-- Version: $VERSION_NAME ($VERSION_CODE)
-- Bundle ID: $BUNDLE_ID
-- Team ID: $APPLE_TEAM_ID
-
-Build Details:
-- Workflow: $WORKFLOW_ID
-- Build Time: $(date)
-- Status: $status
-
-Features Enabled:
-- Push Notifications: $PUSH_NOTIFY
-- Camera: $IS_CAMERA
-- Location: $IS_LOCATION
-- Microphone: $IS_MIC
-- Notifications: $IS_NOTIFICATION
-- Contacts: $IS_CONTACT
-- Biometric: $IS_BIOMETRIC
-- Calendar: $IS_CALENDAR
-- Storage: $IS_STORAGE
-
-$message
-"
-        
-        # Send email using curl (simple SMTP)
-        if [ -n "$EMAIL_SMTP_SERVER" ] && [ -n "$EMAIL_SMTP_USER" ] && [ -n "$EMAIL_SMTP_PASS" ]; then
-            log_info "Sending email via SMTP..."
-            # Note: This is a simplified email sending. In production, use a proper email service
-            log_success "Email notification sent (simulated)"
-        else
-            log_warning "Email credentials not configured, skipping email"
-        fi
-    else
-        log_info "Email notifications disabled or email not configured"
-    fi
-}
-
-# Step 1: Environment Setup and Validation
-log_info "Step 1: Environment Setup and Validation"
-log "================================================"
 
 # Set all required variables with defaults
 export WORKFLOW_ID=$(get_env_var "WORKFLOW_ID" "ios-workflow")
@@ -255,8 +232,10 @@ fi
 
 log_success "Environment variables validated"
 
-# Send build start notification
-send_email_notification "STARTED" "iOS Build Started" "iOS build process has started for $APP_NAME"
+# Step 1: Create Default Assets
+log_info "Step 1: Create Default Assets"
+log "================================================"
+create_default_assets
 
 # Step 2: Download Assets for Dart Codes
 log_info "Step 2: Download Assets for Dart Codes"
@@ -264,11 +243,10 @@ log "================================================"
 
 # Download logo
 if [ -n "$LOGO_URL" ]; then
-    if safe_download "$LOGO_URL" "assets/images/logo.png" "app logo"; then
+    if improved_download "$LOGO_URL" "assets/images/logo.png" "app logo"; then
         log_success "Logo downloaded successfully"
     else
         log_warning "Failed to download logo, using default"
-        # Copy default logo if available
         if [ -f "assets/images/default_logo.png" ]; then
             cp "assets/images/default_logo.png" "assets/images/logo.png"
             log_info "Using default logo"
@@ -284,11 +262,10 @@ fi
 
 # Download splash image
 if [ -n "$SPLASH_URL" ]; then
-    if safe_download "$SPLASH_URL" "assets/images/splash.png" "splash image"; then
+    if improved_download "$SPLASH_URL" "assets/images/splash.png" "splash image"; then
         log_success "Splash image downloaded successfully"
     else
         log_warning "Failed to download splash image, using default"
-        # Copy default splash if available
         if [ -f "assets/images/splash.png" ]; then
             log_info "Using existing splash image"
         elif [ -f "assets/images/default_logo.png" ]; then
@@ -308,11 +285,10 @@ fi
 
 # Download splash background
 if [ -n "$SPLASH_BG_URL" ]; then
-    if safe_download "$SPLASH_BG_URL" "assets/images/splash_bg.png" "splash background"; then
+    if improved_download "$SPLASH_BG_URL" "assets/images/splash_bg.png" "splash background"; then
         log_success "Splash background downloaded successfully"
     else
         log_warning "Failed to download splash background, using default"
-        # Create a simple colored background if needed
         if command -v convert >/dev/null 2>&1; then
             convert -size 1125x2436 xc:"$SPLASH_BG_COLOR" "assets/images/splash_bg.png"
             log_info "Created default splash background with color: $SPLASH_BG_COLOR"
@@ -332,7 +308,7 @@ log "================================================"
 
 # Download Firebase config if push notifications enabled
 if [ "$PUSH_NOTIFY" = "true" ] && [ -n "$FIREBASE_CONFIG_IOS" ]; then
-    if safe_download "$FIREBASE_CONFIG_IOS" "ios/GoogleService-Info.plist" "Firebase config"; then
+    if improved_download "$FIREBASE_CONFIG_IOS" "ios/GoogleService-Info.plist" "Firebase config"; then
         log_success "Firebase config downloaded successfully"
     else
         log_warning "Failed to download Firebase config"
@@ -342,7 +318,7 @@ fi
 
 # Download APNS auth key if provided
 if [ -n "$APNS_AUTH_KEY_URL" ] && [ -n "$APNS_KEY_ID" ]; then
-    if safe_download "$APNS_AUTH_KEY_URL" "ios/AuthKey_${APNS_KEY_ID}.p8" "APNS auth key"; then
+    if improved_download "$APNS_AUTH_KEY_URL" "ios/AuthKey_${APNS_KEY_ID}.p8" "APNS auth key"; then
         log_success "APNS auth key downloaded successfully"
     else
         log_warning "Failed to download APNS auth key"
@@ -353,7 +329,7 @@ fi
 # Handle iOS certificates (Option 1: P12 file)
 if [ -n "$CERT_P12_URL" ] && [ -n "$CERT_PASSWORD" ]; then
     log_info "Using Option 1: P12 certificate"
-    if safe_download "$CERT_P12_URL" "ios/certificates/Certificates.p12" "P12 certificate"; then
+    if improved_download "$CERT_P12_URL" "ios/certificates/Certificates.p12" "P12 certificate"; then
         log_success "P12 certificate downloaded successfully"
     else
         log_warning "Failed to download P12 certificate"
@@ -374,7 +350,7 @@ fi
 
 # Download provisioning profile
 if [ -n "$PROFILE_URL" ]; then
-    if safe_download "$PROFILE_URL" "ios/Runner.mobileprovision" "provisioning profile"; then
+    if improved_download "$PROFILE_URL" "ios/Runner.mobileprovision" "provisioning profile"; then
         log_success "Provisioning profile downloaded successfully"
     else
         log_warning "Failed to download provisioning profile"
@@ -428,7 +404,7 @@ ESCAPED_BOTTOMMENU_ITEMS=$(escape_dart_string "$BOTTOMMENU_ITEMS")
 ESCAPED_SPLASH_TAGLINE=$(escape_dart_string "$SPLASH_TAGLINE")
 
 cat > lib/config/env_config.dart <<EOF
-// Generated by iOS Workflow Script
+// Generated by Improved iOS Workflow Script
 // Do not edit manually
 
 class EnvConfig {
@@ -749,11 +725,11 @@ else
     log_warning "Failed to copy IPA to output directory"
 fi
 
-# Step 11: Final Summary and Email Notification
-log_info "Step 11: Final Summary and Email Notification"
+# Step 11: Final Summary
+log_info "Step 11: Final Summary"
 log "================================================"
 
-log_success "🎉 New iOS Workflow Completed Successfully!"
+log_success "🎉 Improved iOS Workflow Completed Successfully!"
 log "📱 App: $APP_NAME v$VERSION_NAME ($VERSION_CODE)"
 log "🆔 Bundle ID: $BUNDLE_ID"
 log "👥 Team ID: $APPLE_TEAM_ID"
@@ -769,9 +745,6 @@ log "   - Biometric: $IS_BIOMETRIC"
 log "   - Calendar: $IS_CALENDAR"
 log "   - Storage: $IS_STORAGE"
 
-# Send build success notification
-send_email_notification "SUCCESS" "iOS Build Completed Successfully" "iOS build completed successfully for $APP_NAME. IPA file is ready for distribution."
-
-log_success "✅ New iOS workflow completed successfully!"
+log_success "✅ Improved iOS workflow completed successfully!"
 log_info "Build process finished - check artifacts for IPA file"
 exit 0 
