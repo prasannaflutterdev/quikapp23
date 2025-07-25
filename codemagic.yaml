@@ -430,18 +430,18 @@ workflows:
           
           echo "✅ Environment validation completed"
           
-      - name: 🚀 Single iOS Build Script
+      - name: 🚀 New Comprehensive iOS Build Script
         script: |
-          echo "🚀 Starting unified iOS build process..."
+          echo "🚀 Starting new comprehensive iOS build process..."
           echo "================================================"
           
           # Make the script executable
-          chmod +x lib/scripts/ios-workflow/build_ios_simple.sh
+          chmod +x lib/scripts/ios-workflow/new_ios_workflow.sh
           
-          # Run the simplified iOS build script
-          ./lib/scripts/ios-workflow/build_ios_simple.sh
+          # Run the new comprehensive iOS build script
+          ./lib/scripts/ios-workflow/new_ios_workflow.sh
           
-          echo "✅ iOS build process completed"
+          echo "✅ New iOS build process completed"
 
     artifacts:
       - build/export/*.ipa

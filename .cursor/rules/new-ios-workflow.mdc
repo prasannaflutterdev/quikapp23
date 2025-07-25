@@ -1,0 +1,85 @@
+---
+alwaysApply: true
+---
+Ios-workflow 
+Need to Create Script
+dont hardcode any variables for the following
+1.   	Download assets for dart codes by LOGO_URL, SPLASH_URL, SPLASH_BG_URL in correct path
+2.   	Download files for
+a.   	Firebase if PUSH_NOTIFY = true then FIREBASE_CONFIG_IOS
+b.  	IOS Certificates(user should use any one option like vise validate)
+ i.      Option1: CERT_P12_URL, CERT_PASSWORD for codesiginig
+ii.      Option2: CERT_CER_URL, CERT_KEY_URL Using this generate p12 file and then for codesiging.
+c.   	C. Provisioning Profile:   PROFILE_URL
+3.   	Configure APP_NAME, BUNDLE_ID, APP_ICON(from LOGO_URL image) change Bundle id for Runner Targets only not framework Targets
+4.   	Pass the variables required for dart using cat EOF command to inject variables for env_config.dart
+5.   	Configure firebase based on PUSH_NOTIFY for ios
+6.   	Inject permissions dynamically, for  IS_CAMERA, IS_LOCATION, IS_MIC, IS_NOTIFICATION, IS_CONTACT, IS_BIOMETRIC, IS_CALENDAR, S_STORAGE
+7.   	Try for flutter build ios using no codesigining
+8.   	Build xarchive form xcodebuild with proper codesiging
+9.   	Create export option and export ipa from xarchive
+10.   Use Email Notification for Build Status, with all featurs/permission with app informations, Started, Build Success, don’t sent error emails
+Example API Variables for codemagic.yaml
+"WORKFLOW_ID": "ios-workflow",
+ 	   "USER_NAME":"prasannasrie",
+    	"APP_ID":"10023",
+    	"VERSION_NAME": "1.0.5",
+    	"VERSION_CODE": "51",
+    	"APP_NAME": "Garbcode App",
+    	"ORG_NAME": "Garbcode Apparels Private Limited",
+    	"WEB_URL": "https://garbcode.com/",
+    	"PKG_NAME": "com.garbcode.garbcodeapp",
+    	"BUNDLE_ID": "com.garbcode.garbcodeapp",
+    	"EMAIL_ID": "prasannasrinivasan32@gmail.com",
+    	"PUSH_NOTIFY": "true",
+    	"IS_CHATBOT":"true",
+ 
+    	"IS_DOMAIN_URL": "true",//Ckeck Our Domain IS_DEEPLINK changed to IS_DOMAIN_URL
+    	"IS_SPLASH": "true",//Splash Screen
+    	"IS_PULLDOWN": "true",//Pull Down to Referesh
+    	"IS_BOTTOMMENU": "true",//Bottom Menu
+    	"IS_LOAD_IND":"true",//Loading indicators
+ 
+  
+    	"IS_CAMERA": "false",
+    	"IS_LOCATION": "false",
+    	"IS_MIC": "true",
+    	"IS_NOTIFICATION": "true",
+    	"IS_CONTACT": "false",
+    	"IS_BIOMETRIC": "false",
+    	"IS_CALENDAR": "false",
+    	"IS_STORAGE": "true",
+ 
+    	"LOGO_URL": "https://raw.githubusercontent.com/prasanna91/QuikApp/main/twinklub_png_logo.png",
+ 	
+    	"SPLASH_URL": "https://raw.githubusercontent.com/prasanna91/QuikApp/main/twinklub_png_logo.png",
+    	"SPLASH_BG_URL": "",
+    	"SPLASH_BG_COLOR": "#cbdbf5",
+    	"SPLASH_TAGLINE": "TWINKLUB",
+    	"SPLASH_TAGLINE_COLOR": "#a30237",
+    	"SPLASH_ANIMATION": "zoom",
+    	"SPLASH_DURATION": "4",
+    	"BOTTOMMENU_ITEMS": "[{\"label\":\"Home\",\"icon\":{\"type\":\"preset\",\"name\":\"home_outlined\"},\"url\":\"https://twinklub.com/\"},{\"label\":\"New Arraivals\",\"icon\":{\"type\":\"custom\",\"icon_url\":\"https://raw.githubusercontent.com/prasanna91/QuikApp/main/card.svg\",\"icon_size\":\"24\"},\"url\":\"https://www.twinklub.com/collections/new-arrivals\"},{\"label\":\"Collections\",\"icon\":{\"type\":\"custom\",\"icon_url\":\"https://raw.githubusercontent.com/prasanna91/QuikApp/main/about.svg\",\"icon_size\":\"24\"},\"url\":\"https://www.twinklub.com/collections/all\"},{\"label\":\"Contact\",\"icon\":{\"type\":\"custom\",\"icon_url\":\"https://raw.githubusercontent.com/prasanna91/QuikApp/main/contact.svg\",\"icon_size\":\"24\"},\"url\":\"https://www.twinklub.com/account\"}]",
+    	"BOTTOMMENU_BG_COLOR": "#FFFFFF",
+    	"BOTTOMMENU_ICON_COLOR": "#6d6e8c",
+    	"BOTTOMMENU_TEXT_COLOR": "#6d6e8c",
+    	"BOTTOMMENU_FONT": "DM Sans",
+    	"BOTTOMMENU_FONT_SIZE": "12",
+    	"BOTTOMMENU_FONT_BOLD": "false",
+    	"BOTTOMMENU_FONT_ITALIC": "false",
+        "BOTTOMMENU_ACTIVE_TAB_COLOR": "#a30237",
+    	"BOTTOMMENU_ICON_POSITION": "above",
+    	"FIREBASE_CONFIG_IOS": "https://raw.githubusercontent.com/prasanna91/QuikApp/main/GoogleService-Info-gc.plist",
+    	"APNS_KEY_ID": "6VB3VLTXV6",
+    	"APNS_AUTH_KEY_URL": "https://raw.githubusercontent.com/prasanna91/QuikApp/main/AuthKey_V566SWNF69.p8",
+        "PROFILE_TYPE":"app-store”, "PROFILE_URL":"https://raw.githubusercontent.com/prasanna91/QuikApp/main/Garbcode_App_App_Store.mobileprovision",
+	      "CERT_PASSWORD": "qwerty123",      "CERT_P12_URL":"https://raw.githubusercontent.com/prasanna91/QuikApp/main/Certificates.p12"	
+  	"CERT_CER_URL": "https://raw.githubusercontent.com/prasanna91/QuikApp/main/ios_distribution.cer",
+  	"CERT_KEY_URL": "https://raw.githubusercontent.com/prasanna91/QuikApp/main/private.key",
+ 
+        "ENABLE_EMAIL_NOTIFICATIONS":"true",
+        "EMAIL_SMTP_SERVER":"smtp.gmail.com",
+        "EMAIL_SMTP_PORT":"587",
+  	  "EMAIL_SMTP_USER":"prasannasrie@gmail.com",
+    	"EMAIL_SMTP_PASS":"lrnu krfm aarp urux"
+

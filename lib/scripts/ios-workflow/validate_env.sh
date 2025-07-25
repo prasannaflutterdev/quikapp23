@@ -39,21 +39,8 @@ test_url() {
     
     log_info "Testing URL for $description"
     
-    # Test URL with curl - try multiple methods
-    local success=false
-    
-    # Method 1: HEAD request
-    if curl -I -s -f "$url" >/dev/null 2>&1; then
-        success=true
-    # Method 2: GET request with range
-    elif curl -r 0-1023 -s -f "$url" >/dev/null 2>&1; then
-        success=true
-    # Method 3: Simple GET request
-    elif curl -s -f "$url" >/dev/null 2>&1; then
-        success=true
-    fi
-    
-    if [ "$success" = true ]; then
+    # Test URL with the exact same method as the working curl command
+    if curl -L -f -s -o /dev/null "$url" 2>/dev/null; then
         log_success "URL accessible: $description"
         return 0
     else
