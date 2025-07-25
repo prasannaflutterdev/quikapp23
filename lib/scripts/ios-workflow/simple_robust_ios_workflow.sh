@@ -430,7 +430,7 @@ EOF
     printf "  static const String splashTagline = \"%s\";\n" "$(clean_env_var "${SPLASH_TAGLINE:-}")" >> lib/config/env_config.dart
     printf "  static const String splashTaglineColor = \"%s\";\n" "$(clean_env_var "${SPLASH_TAGLINE_COLOR:-#000000}")" >> lib/config/env_config.dart
     printf "  static const String splashAnimation = \"%s\";\n" "$(clean_env_var "${SPLASH_ANIMATION:-fade}")" >> lib/config/env_config.dart
-    printf "  static const String splashDuration = \"%s\";\n" "$(clean_env_var "${SPLASH_DURATION:-3}")" >> lib/config/env_config.dart
+    printf "  static const int splashDuration = %s;\n" "$(clean_env_var "${SPLASH_DURATION:-3}")" >> lib/config/env_config.dart
 
     # Add missing properties that are used in main.dart
     printf "  static const String splashUrl = \"%s\";\n" "$(clean_env_var "${SPLASH_URL:-}")" >> lib/config/env_config.dart
@@ -468,6 +468,14 @@ EOF
     printf "  static const String bottommenuTextColor = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_TEXT_COLOR:-#666666}")" >> lib/config/env_config.dart
     printf "  static const String bottommenuIconColor = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_ICON_COLOR:-#666666}")" >> lib/config/env_config.dart
     printf "  static const String bottommenuIconPosition = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_ICON_POSITION:-above}")" >> lib/config/env_config.dart
+
+    # Add missing properties used in other files
+    printf "  static const String bottommenuFont = \"%s\";\n" "$(clean_env_var "${BOTTOMMENU_FONT:-Roboto}")" >> lib/config/env_config.dart
+    printf "  static const double bottommenuFontSize = %s;\n" "$(clean_env_var "${BOTTOMMENU_FONT_SIZE:-12}")" >> lib/config/env_config.dart
+    printf "  static const bool bottommenuFontBold = %s;\n" "${BOTTOMMENU_FONT_BOLD:-false}" >> lib/config/env_config.dart
+    printf "  static const bool bottommenuFontItalic = %s;\n" "${BOTTOMMENU_FONT_ITALIC:-false}" >> lib/config/env_config.dart
+    printf "  static const String firebaseConfigAndroid = \"%s\";\n" "$(clean_env_var "${FIREBASE_CONFIG_ANDROID:-}")" >> lib/config/env_config.dart
+    printf "  static const String firebaseConfigIos = \"%s\";\n" "$(clean_env_var "${FIREBASE_CONFIG_IOS:-}")" >> lib/config/env_config.dart
 
     cat >> lib/config/env_config.dart <<EOF
 }

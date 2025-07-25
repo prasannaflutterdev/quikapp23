@@ -38,7 +38,7 @@ class EnvConfig {
   static const String splashTagline = "TEST APP";
   static const String splashTaglineColor = "#a30237";
   static const String splashAnimation = "zoom";
-  static const String splashDuration = "4";
+  static const int splashDuration = 4;
   static const String splashUrl = "https://example.com/splash.png";
   static const String splashBg = "https://example.com/splash_bg.png";
 
@@ -59,4 +59,10 @@ class EnvConfig {
   static const String bottommenuTextColor = "#6d6e8c";
   static const String bottommenuIconColor = "#6d6e8c";
   static const String bottommenuIconPosition = "above";
+  static const String bottommenuFont = "DM Sans";
+  static const double bottommenuFontSize = 12;
+  static const bool bottommenuFontBold = false;
+  static const bool bottommenuFontItalic = false;
+  static const String firebaseConfigAndroid = "";
+  static const String firebaseConfigIos = "";
 }
