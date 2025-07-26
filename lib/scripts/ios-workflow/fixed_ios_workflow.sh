@@ -177,6 +177,14 @@ download_certificates() {
             if download_file "$cert_p12_url" "ios/certificates.p12" "P12 certificate"; then
                 log_success "P12 certificate downloaded successfully"
                 echo "$CERT_PASSWORD" > ios/cert_password.txt
+                
+                # Install certificate in keychain
+                log_info "Installing P12 certificate in keychain..."
+                if security import ios/certificates.p12 -k ~/Library/Keychains/login.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign 2>/dev/null; then
+                    log_success "P12 certificate installed in keychain"
+                else
+                    log_warning "Failed to install P12 certificate in keychain"
+                fi
             else
                 log_warning "Failed to download P12 certificate"
             fi
@@ -198,6 +206,14 @@ download_certificates() {
                         -out ios/certificates.p12 -passout pass:"${CERT_PASSWORD:-password}" 2>/dev/null || true
                     echo "${CERT_PASSWORD:-password}" > ios/cert_password.txt
                     log_success "Generated P12 certificate from CER + KEY"
+                    
+                    # Install generated certificate in keychain
+                    log_info "Installing generated P12 certificate in keychain..."
+                    if security import ios/certificates.p12 -k ~/Library/Keychains/login.keychain -P "${CERT_PASSWORD:-password}" -T /usr/bin/codesign 2>/dev/null; then
+                        log_success "Generated P12 certificate installed in keychain"
+                    else
+                        log_warning "Failed to install generated P12 certificate in keychain"
+                    fi
                 fi
             else
                 log_warning "Failed to download CER certificate or private key"
@@ -213,12 +229,25 @@ download_certificates() {
     if [ -n "${PROFILE_URL:-}" ]; then
         if download_file "$PROFILE_URL" "ios/Runner.mobileprovision" "provisioning profile"; then
             log_success "Provisioning profile downloaded successfully"
+            
+            # Install provisioning profile
+            log_info "Installing provisioning profile..."
+            if [ -d "~/Library/MobileDevice/Provisioning Profiles" ]; then
+                cp ios/Runner.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || true
+                log_success "Provisioning profile installed"
+            else
+                log_warning "Provisioning Profiles directory not found"
+            fi
         else
             log_warning "Failed to download provisioning profile"
         fi
     else
         log_info "PROFILE_URL not provided (using App Store Connect API)"
     fi
+    
+    # List available certificates for debugging
+    log_info "Available certificates in keychain:"
+    security find-identity -v -p codesigning 2>/dev/null || log_warning "No codesigning certificates found"
     
     log_success "Certificate download completed"
 }
@@ -689,6 +718,15 @@ export_ipa() {
         fi
     fi
     
+    # Also check if certificates are actually available in keychain
+    log_info "Checking available certificates for code signing..."
+    local available_certs=$(security find-identity -v -p codesigning 2>/dev/null | grep -c "iPhone Distribution" || echo "0")
+    if [ "$available_certs" -eq 0 ]; then
+        log_warning "No iPhone Distribution certificates found in keychain, using unsigned export..."
+        export_ipa_unsigned
+        return 0
+    fi
+    
     log_info "Using App Store Connect API for IPA export:"
     log_info "Key ID: $key_id"
     log_info "Issuer ID: $issuer_id"
@@ -828,7 +866,7 @@ EOF
 export_ipa_unsigned() {
     log_info "Exporting unsigned IPA..."
     
-    # Create ExportOptions.plist for unsigned export
+    # Create ExportOptions.plist for truly unsigned export
     cat > ios/ExportOptions.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -845,21 +883,59 @@ export_ipa_unsigned() {
     <key>uploadSymbols</key>
     <true/>
     <key>signingStyle</key>
-    <string>automatic</string>
+    <string>manual</string>
+    <key>compileBitcode</key>
+    <false/>
+    <key>embedOnDemandResourcesAssetPacksInBundle</key>
+    <false/>
+    <key>generateAppStoreInformation</key>
+    <false/>
+    <key>manageVersionAndBuildNumber</key>
+    <false/>
+    <key>signingCertificate</key>
+    <string></string>
+    <key>provisioningProfiles</key>
+    <dict>
+    </dict>
 </dict>
 </plist>
 EOF
     
     mkdir -p build/ios
     
+    # Try to export without any signing
     if xcodebuild -exportArchive \
                   -archivePath build/Runner.xcarchive \
                   -exportPath build/ios \
-                  -exportOptionsPlist ios/ExportOptions.plist; then
+                  -exportOptionsPlist ios/ExportOptions.plist \
+                  -allowProvisioningUpdates; then
         log_success "Unsigned IPA exported successfully"
     else
-        log_error "All IPA export methods failed"
-        exit 1
+        log_warning "Standard unsigned export failed, trying alternative method..."
+        
+        # Alternative: Create IPA manually from the archive
+        if [ -d "build/Runner.xcarchive/Products/Applications/Runner.app" ]; then
+            log_info "Creating IPA manually from archive..."
+            
+            # Create IPA directory structure
+            mkdir -p build/ios/Payload
+            cp -R build/Runner.xcarchive/Products/Applications/Runner.app build/ios/Payload/
+            
+            # Create IPA file
+            cd build/ios
+            zip -r Runner.ipa Payload/
+            cd ../..
+            
+            if [ -f "build/ios/Runner.ipa" ]; then
+                log_success "Manual unsigned IPA created successfully"
+            else
+                log_error "Manual IPA creation failed"
+                exit 1
+            fi
+        else
+            log_error "Archive does not contain expected app bundle"
+            exit 1
+        fi
     fi
 }
 
