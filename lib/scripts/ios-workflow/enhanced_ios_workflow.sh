@@ -156,6 +156,21 @@ download_certificates() {
         log_info "Firebase not configured (PUSH_NOTIFY=false or FIREBASE_CONFIG_IOS not provided)"
     fi
     
+    # Download App Store Connect API key if available
+    local key_id=$(safe_env_var "APP_STORE_CONNECT_KEY_IDENTIFIER" "")
+    local api_key_url=$(safe_env_var "APP_STORE_CONNECT_API_KEY_URL" "")
+    
+    if [ -n "$key_id" ] && [ -n "$api_key_url" ]; then
+        log_info "Downloading App Store Connect API key..."
+        if download_file "$api_key_url" "ios/AuthKey_$key_id.p8" "App Store Connect API key"; then
+            log_success "App Store Connect API key downloaded successfully"
+        else
+            log_warning "Failed to download App Store Connect API key"
+        fi
+    else
+        log_info "App Store Connect API key not configured"
+    fi
+    
     # Download certificates (Option 1: P12)
     if [ -n "${CERT_P12_URL:-}" ] && [ -n "${CERT_PASSWORD:-}" ]; then
         log_info "Using P12 certificate option"
@@ -469,21 +484,6 @@ create_unsigned_build() {
 create_archive() {
     log_info "Creating Xcode archive with proper code signing..."
     
-    # Set up code signing if certificates are available
-    if [ -f "ios/certificates.p12" ] && [ -f "ios/Runner.mobileprovision" ]; then
-        log_info "Using downloaded certificates for code signing"
-        
-        # Import certificate to keychain
-        if [ -f "ios/cert_password.txt" ]; then
-            security import ios/certificates.p12 -k login.keychain -P "$(cat ios/cert_password.txt)" -T /usr/bin/codesign 2>/dev/null || true
-        fi
-        
-        # Install provisioning profile
-        cp ios/Runner.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || true
-    else
-        log_warning "No certificates found, using automatic code signing"
-    fi
-    
     # Get team ID from environment
     local team_id=$(safe_env_var "APPLE_TEAM_ID" "")
     
@@ -494,71 +494,68 @@ create_archive() {
     
     log_info "Using team ID for archive creation: $team_id"
     
-    # Try archive creation with automatic code signing (preferred method)
+    # For App Store Connect API workflow, we'll create archive without code signing
+    # and use App Store Connect API for IPA export
+    log_info "Creating archive without code signing (will use App Store Connect API for IPA export)"
+    
     if xcodebuild -workspace ios/Runner.xcworkspace \
                   -scheme Runner \
                   -configuration Release \
                   -archivePath build/Runner.xcarchive \
-                  DEVELOPMENT_TEAM="$team_id" \
-                  CODE_SIGN_STYLE="Automatic" \
-                  CODE_SIGN_IDENTITY="iPhone Developer" \
+                  CODE_SIGN_IDENTITY="" \
+                  CODE_SIGNING_REQUIRED=NO \
+                  CODE_SIGNING_ALLOWED=NO \
                   archive; then
-        log_success "Archive created successfully with automatic code signing"
+        log_success "Archive created successfully without code signing"
+        log_info "Archive will be codesigned during IPA export using App Store Connect API"
         return 0
     else
-        log_warning "Archive failed with automatic signing, trying manual signing"
-        
-        # Try with manual code signing
-        if xcodebuild -workspace ios/Runner.xcworkspace \
-                      -scheme Runner \
-                      -configuration Release \
-                      -archivePath build/Runner.xcarchive \
-                      DEVELOPMENT_TEAM="$team_id" \
-                      CODE_SIGN_STYLE="Manual" \
-                      CODE_SIGN_IDENTITY="iPhone Developer" \
-                      archive; then
-            log_success "Archive created successfully with manual code signing"
-            return 0
-        else
-            log_error "Archive creation failed with both automatic and manual signing"
-            log_error "Please ensure you have a valid team ID and proper code signing setup"
-            exit 1
-        fi
+        log_error "Archive creation failed"
+        log_error "Please check your build configuration and ensure all dependencies are properly set up"
+        exit 1
     fi
 }
 
 # Function to export IPA (Requirement 9)
 export_ipa() {
-    log_info "Exporting IPA from archive..."
+    log_info "Exporting IPA from archive using App Store Connect API..."
     
-    # Get team ID from environment
+    # Get App Store Connect API variables
+    local key_id=$(safe_env_var "APP_STORE_CONNECT_KEY_IDENTIFIER" "")
+    local issuer_id=$(safe_env_var "APP_STORE_CONNECT_ISSUER_ID" "")
+    local api_key_url=$(safe_env_var "APP_STORE_CONNECT_API_KEY_URL" "")
     local team_id=$(safe_env_var "APPLE_TEAM_ID" "")
     
-    if [ -z "$team_id" ]; then
-        log_error "APPLE_TEAM_ID is required for IPA export. Please provide a valid team ID."
+    # Validate App Store Connect API variables
+    if [ -z "$key_id" ] || [ -z "$issuer_id" ] || [ -z "$api_key_url" ]; then
+        log_error "App Store Connect API variables are required:"
+        log_error "APP_STORE_CONNECT_KEY_IDENTIFIER: $key_id"
+        log_error "APP_STORE_CONNECT_ISSUER_ID: $issuer_id"
+        log_error "APP_STORE_CONNECT_API_KEY_URL: $api_key_url"
         exit 1
     fi
     
-    # Check if we have certificates and profiles
-    local has_certificates=false
-    local has_profiles=false
+    log_info "Using App Store Connect API for IPA export:"
+    log_info "Key ID: $key_id"
+    log_info "Issuer ID: $issuer_id"
+    log_info "API Key URL: $api_key_url"
+    log_info "Team ID: $team_id"
     
-    if [ -f "ios/certificates.p12" ] && [ -f "ios/cert_password.txt" ]; then
-        has_certificates=true
-        log_info "Found downloaded certificates"
-    fi
-    
-    if [ -f "ios/Runner.mobileprovision" ]; then
-        has_profiles=true
-        log_info "Found downloaded provisioning profile"
+    # Download App Store Connect API key
+    log_info "Downloading App Store Connect API key..."
+    if download_file "$api_key_url" "ios/AuthKey_$key_id.p8" "App Store Connect API key"; then
+        log_success "App Store Connect API key downloaded successfully"
+    else
+        log_error "Failed to download App Store Connect API key"
+        exit 1
     fi
     
     # Get the current bundle ID for code signing
     local current_bundle_id=$(grep -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*;' ios/Runner.xcodeproj/project.pbxproj | head -1 | sed 's/PRODUCT_BUNDLE_IDENTIFIER = //;s/;//')
     log_info "Using bundle ID for code signing: $current_bundle_id"
     
-    # Create ExportOptions.plist for codesigned IPA
-    log_info "Creating ExportOptions.plist for codesigned IPA export"
+    # Create ExportOptions.plist for App Store Connect API
+    log_info "Creating ExportOptions.plist for App Store Connect API export"
     plutil -create xml1 ios/ExportOptions.plist
     plutil -insert method -string app-store-connect ios/ExportOptions.plist
     plutil -insert teamID -string "$team_id" ios/ExportOptions.plist
@@ -566,16 +563,19 @@ export_ipa() {
     plutil -insert uploadBitcode -bool false ios/ExportOptions.plist
     plutil -insert uploadSymbols -bool true ios/ExportOptions.plist
     
-    # Use automatic signing for IPA export
+    # Use App Store Connect API for signing
     plutil -insert signingStyle -string automatic ios/ExportOptions.plist
+    plutil -insert apiKeyID -string "$key_id" ios/ExportOptions.plist
+    plutil -insert apiKeyIssuerID -string "$issuer_id" ios/ExportOptions.plist
+    plutil -insert apiKeyPath -string "ios/AuthKey_$key_id.p8" ios/ExportOptions.plist
     
-    # Export IPA with code signing
-    log_info "Exporting codesigned IPA..."
+    # Export IPA with App Store Connect API
+    log_info "Exporting codesigned IPA using App Store Connect API..."
     if xcodebuild -exportArchive \
                   -archivePath build/Runner.xcarchive \
                   -exportPath build/ios \
                   -exportOptionsPlist ios/ExportOptions.plist; then
-        log_success "Codesigned IPA exported successfully"
+        log_success "Codesigned IPA exported successfully using App Store Connect API"
         
         # Verify the IPA was created
         if [ -f "build/ios/Runner.ipa" ]; then
@@ -586,8 +586,12 @@ export_ipa() {
             exit 1
         fi
     else
-        log_error "IPA export failed. Please check your code signing setup."
-        log_error "Required: Valid APPLE_TEAM_ID and proper code signing configuration"
+        log_error "IPA export failed using App Store Connect API."
+        log_error "Please check your App Store Connect API configuration:"
+        log_error "- APP_STORE_CONNECT_KEY_IDENTIFIER: $key_id"
+        log_error "- APP_STORE_CONNECT_ISSUER_ID: $issuer_id"
+        log_error "- APP_STORE_CONNECT_API_KEY_URL: $api_key_url"
+        log_error "- APPLE_TEAM_ID: $team_id"
         exit 1
     fi
 }
