@@ -484,71 +484,46 @@ create_archive() {
         log_warning "No certificates found, using automatic code signing"
     fi
     
-    # Get team ID from environment or use automatic signing
+    # Get team ID from environment
     local team_id=$(safe_env_var "APPLE_TEAM_ID" "")
     
-    # Try multiple approaches for archive creation
-    local archive_success=false
+    if [ -z "$team_id" ]; then
+        log_error "APPLE_TEAM_ID is required for code signing. Please provide a valid team ID."
+        exit 1
+    fi
     
-    # Approach 1: With team ID and automatic signing
-    if [ -n "$team_id" ]; then
-        log_info "Trying archive with team ID: $team_id"
+    log_info "Using team ID for archive creation: $team_id"
+    
+    # Try archive creation with automatic code signing (preferred method)
+    if xcodebuild -workspace ios/Runner.xcworkspace \
+                  -scheme Runner \
+                  -configuration Release \
+                  -archivePath build/Runner.xcarchive \
+                  DEVELOPMENT_TEAM="$team_id" \
+                  CODE_SIGN_STYLE="Automatic" \
+                  CODE_SIGN_IDENTITY="iPhone Developer" \
+                  archive; then
+        log_success "Archive created successfully with automatic code signing"
+        return 0
+    else
+        log_warning "Archive failed with automatic signing, trying manual signing"
+        
+        # Try with manual code signing
         if xcodebuild -workspace ios/Runner.xcworkspace \
                       -scheme Runner \
                       -configuration Release \
                       -archivePath build/Runner.xcarchive \
                       DEVELOPMENT_TEAM="$team_id" \
-                      CODE_SIGN_STYLE="Automatic" \
-                      archive 2>/dev/null; then
-            log_success "Archive created successfully with team ID"
-            archive_success=true
+                      CODE_SIGN_STYLE="Manual" \
+                      CODE_SIGN_IDENTITY="iPhone Developer" \
+                      archive; then
+            log_success "Archive created successfully with manual code signing"
+            return 0
         else
-            log_warning "Archive failed with team ID, trying without code signing"
-        fi
-    fi
-    
-    # Approach 2: Without code signing
-    if [ "$archive_success" = false ]; then
-        log_info "Trying archive without code signing"
-        if xcodebuild -workspace ios/Runner.xcworkspace \
-                      -scheme Runner \
-                      -configuration Release \
-                      -archivePath build/Runner.xcarchive \
-                      CODE_SIGN_IDENTITY="" \
-                      CODE_SIGNING_REQUIRED=NO \
-                      CODE_SIGNING_ALLOWED=NO \
-                      archive 2>/dev/null; then
-            log_success "Archive created successfully without code signing"
-            archive_success=true
-        else
-            log_warning "Archive failed without code signing"
-        fi
-    fi
-    
-    # Approach 3: Simple build without archive
-    if [ "$archive_success" = false ]; then
-        log_warning "Archive creation failed, creating simple build"
-        if xcodebuild -workspace ios/Runner.xcworkspace \
-                      -scheme Runner \
-                      -configuration Release \
-                      -destination generic/platform=iOS \
-                      build 2>/dev/null; then
-            log_success "Simple build completed successfully"
-            # Create a dummy archive for export
-            mkdir -p build/Runner.xcarchive/Products/Applications
-            cp -r build/ios/iphoneos/Runner.app build/Runner.xcarchive/Products/Applications/ 2>/dev/null || true
-            archive_success=true
-        else
-            log_error "All archive creation methods failed"
+            log_error "Archive creation failed with both automatic and manual signing"
+            log_error "Please ensure you have a valid team ID and proper code signing setup"
             exit 1
         fi
-    fi
-    
-    if [ "$archive_success" = true ]; then
-        log_success "Archive creation completed"
-    else
-        log_error "Failed to create archive"
-        exit 1
     fi
 }
 
@@ -556,8 +531,13 @@ create_archive() {
 export_ipa() {
     log_info "Exporting IPA from archive..."
     
-    # Create export options using simple approach
+    # Get team ID from environment
     local team_id=$(safe_env_var "APPLE_TEAM_ID" "")
+    
+    if [ -z "$team_id" ]; then
+        log_error "APPLE_TEAM_ID is required for IPA export. Please provide a valid team ID."
+        exit 1
+    fi
     
     # Check if we have certificates and profiles
     local has_certificates=false
@@ -577,63 +557,66 @@ export_ipa() {
     local current_bundle_id=$(grep -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*;' ios/Runner.xcodeproj/project.pbxproj | head -1 | sed 's/PRODUCT_BUNDLE_IDENTIFIER = //;s/;//')
     log_info "Using bundle ID for code signing: $current_bundle_id"
     
-    # Determine export method based on available resources
-    if [ -n "$team_id" ] && [ "$has_certificates" = true ] && [ "$has_profiles" = true ]; then
-        log_info "Using team ID with certificates for export: $team_id"
-        # Create ExportOptions.plist with full signing
-        plutil -create xml1 ios/ExportOptions.plist
-        plutil -insert method -string app-store-connect ios/ExportOptions.plist
-        plutil -insert teamID -string "$team_id" ios/ExportOptions.plist
-        plutil -insert signingStyle -string manual ios/ExportOptions.plist
-        plutil -insert stripSwiftSymbols -bool true ios/ExportOptions.plist
-        plutil -insert uploadBitcode -bool false ios/ExportOptions.plist
-        plutil -insert uploadSymbols -bool true ios/ExportOptions.plist
-    elif [ -n "$team_id" ]; then
-        log_info "Using team ID with automatic signing for export: $team_id"
-        # Create ExportOptions.plist with automatic signing
-        plutil -create xml1 ios/ExportOptions.plist
-        plutil -insert method -string app-store-connect ios/ExportOptions.plist
-        plutil -insert teamID -string "$team_id" ios/ExportOptions.plist
-        plutil -insert signingStyle -string automatic ios/ExportOptions.plist
-        plutil -insert stripSwiftSymbols -bool true ios/ExportOptions.plist
-        plutil -insert uploadBitcode -bool false ios/ExportOptions.plist
-        plutil -insert uploadSymbols -bool true ios/ExportOptions.plist
-    else
-        log_warning "No team ID or certificates available, creating unsigned export"
-        # Create ExportOptions.plist without code signing
-        plutil -create xml1 ios/ExportOptions.plist
-        plutil -insert method -string development ios/ExportOptions.plist
-        plutil -insert signingStyle -string manual ios/ExportOptions.plist
-        plutil -insert stripSwiftSymbols -bool true ios/ExportOptions.plist
-        plutil -insert uploadBitcode -bool false ios/ExportOptions.plist
-        plutil -insert uploadSymbols -bool true ios/ExportOptions.plist
-    fi
+    # Create ExportOptions.plist for codesigned IPA
+    log_info "Creating ExportOptions.plist for codesigned IPA export"
+    plutil -create xml1 ios/ExportOptions.plist
+    plutil -insert method -string app-store-connect ios/ExportOptions.plist
+    plutil -insert teamID -string "$team_id" ios/ExportOptions.plist
+    plutil -insert stripSwiftSymbols -bool true ios/ExportOptions.plist
+    plutil -insert uploadBitcode -bool false ios/ExportOptions.plist
+    plutil -insert uploadSymbols -bool true ios/ExportOptions.plist
     
-    # Try to export IPA
+    # Use automatic signing for IPA export
+    plutil -insert signingStyle -string automatic ios/ExportOptions.plist
+    
+    # Export IPA with code signing
+    log_info "Exporting codesigned IPA..."
     if xcodebuild -exportArchive \
                   -archivePath build/Runner.xcarchive \
                   -exportPath build/ios \
-                  -exportOptionsPlist ios/ExportOptions.plist 2>/dev/null; then
-        log_success "IPA exported successfully"
-    else
-        log_warning "IPA export failed, creating unsigned build"
-        # Create a simple unsigned build instead
-        if xcodebuild -workspace ios/Runner.xcworkspace \
-                      -scheme Runner \
-                      -configuration Release \
-                      -destination generic/platform=iOS \
-                      CODE_SIGN_IDENTITY="" \
-                      CODE_SIGNING_REQUIRED=NO \
-                      CODE_SIGNING_ALLOWED=NO \
-                      build 2>/dev/null; then
-            log_success "Unsigned build completed successfully"
-            # Copy the built app to a known location
-            mkdir -p build/ios
-            cp -r build/ios/iphoneos/Runner.app build/ios/ 2>/dev/null || true
+                  -exportOptionsPlist ios/ExportOptions.plist; then
+        log_success "Codesigned IPA exported successfully"
+        
+        # Verify the IPA was created
+        if [ -f "build/ios/Runner.ipa" ]; then
+            log_success "Codesigned IPA file found: build/ios/Runner.ipa"
+            ls -la build/ios/
         else
-            log_error "All export methods failed"
+            log_error "IPA file not found after export"
             exit 1
         fi
+    else
+        log_error "IPA export failed. Please check your code signing setup."
+        log_error "Required: Valid APPLE_TEAM_ID and proper code signing configuration"
+        exit 1
+    fi
+}
+
+# Function to verify code signing
+verify_codesigning() {
+    log_info "Verifying code signing of IPA file..."
+    
+    if [ -f "build/ios/Runner.ipa" ]; then
+        # Check if IPA is codesigned
+        if codesign -dv build/ios/Runner.ipa 2>&1 | grep -q "signed"; then
+            log_success "IPA file is properly codesigned"
+            
+            # Show code signing details
+            log_info "Code signing details:"
+            codesign -dv build/ios/Runner.ipa 2>&1 | head -10
+            
+            # Show bundle identifier
+            local bundle_id=$(codesign -dv build/ios/Runner.ipa 2>&1 | grep "Identifier" | awk '{print $2}')
+            if [ -n "$bundle_id" ]; then
+                log_info "Bundle Identifier: $bundle_id"
+            fi
+        else
+            log_error "IPA file is not properly codesigned"
+            exit 1
+        fi
+    else
+        log_error "IPA file not found for verification"
+        exit 1
     fi
 }
 
@@ -669,13 +652,19 @@ main() {
     # Step 8: Create archive with proper code signing
     create_archive
     
-    # Step 9: Export IPA or create unsigned build
+    # Step 9: Export codesigned IPA
     export_ipa
     
-    # If export failed, try unsigned build as fallback
-    if [ ! -f "build/ios/Runner.ipa" ] && [ ! -d "build/ios/Runner.app" ]; then
-        log_warning "IPA export failed, creating unsigned build as fallback"
-        create_unsigned_build
+    # Step 10: Verify code signing
+    verify_codesigning
+    
+    # Verify codesigned IPA was created
+    if [ -f "build/ios/Runner.ipa" ]; then
+        log_success "Codesigned IPA file successfully created: build/ios/Runner.ipa"
+        log_info "IPA file size: $(ls -lh build/ios/Runner.ipa | awk '{print $5}')"
+    else
+        log_error "Codesigned IPA file not found. Build failed."
+        exit 1
     fi
     
     # Send success notification
