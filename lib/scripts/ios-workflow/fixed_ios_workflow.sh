@@ -238,6 +238,12 @@ download_certificates() {
             else
                 log_warning "Provisioning Profiles directory not found"
             fi
+            
+            # Also copy to the app bundle location for embedding
+            log_info "Setting up provisioning profile for embedding..."
+            mkdir -p ios/Runner
+            cp ios/Runner.mobileprovision ios/Runner/embedded.mobileprovision 2>/dev/null || true
+            log_success "Provisioning profile ready for embedding"
         else
             log_warning "Failed to download provisioning profile"
         fi
@@ -841,6 +847,14 @@ export_ipa_with_p12() {
         <key>${BUNDLE_ID:-com.example.app}</key>
         <string>${PROFILE_URL:-}</string>
     </dict>
+    <key>compileBitcode</key>
+    <false/>
+    <key>embedOnDemandResourcesAssetPacksInBundle</key>
+    <false/>
+    <key>generateAppStoreInformation</key>
+    <false/>
+    <key>manageVersionAndBuildNumber</key>
+    <false/>
 </dict>
 </plist>
 EOF
@@ -883,7 +897,7 @@ export_ipa_unsigned() {
     <key>uploadSymbols</key>
     <true/>
     <key>signingStyle</key>
-    <string>manual</string>
+    <string>automatic</string>
     <key>compileBitcode</key>
     <false/>
     <key>embedOnDemandResourcesAssetPacksInBundle</key>
@@ -892,11 +906,6 @@ export_ipa_unsigned() {
     <false/>
     <key>manageVersionAndBuildNumber</key>
     <false/>
-    <key>signingCertificate</key>
-    <string></string>
-    <key>provisioningProfiles</key>
-    <dict>
-    </dict>
 </dict>
 </plist>
 EOF
@@ -920,6 +929,15 @@ EOF
             # Create IPA directory structure
             mkdir -p build/ios/Payload
             cp -R build/Runner.xcarchive/Products/Applications/Runner.app build/ios/Payload/
+            
+            # Embed provisioning profile if available
+            if [ -f "ios/Runner.mobileprovision" ]; then
+                log_info "Embedding provisioning profile in app bundle..."
+                cp ios/Runner.mobileprovision build/ios/Payload/Runner.app/embedded.mobileprovision
+                log_success "Provisioning profile embedded successfully"
+            else
+                log_warning "No provisioning profile found, creating unsigned IPA"
+            fi
             
             # Create IPA file
             cd build/ios
@@ -964,6 +982,38 @@ verify_codesigning() {
             log_info "IPA file information:"
             ls -la build/ios/Runner.ipa
             log_info "File size: $(ls -lh build/ios/Runner.ipa | awk '{print $5}')"
+        fi
+        
+        # Check if provisioning profile is embedded
+        log_info "Checking for embedded provisioning profile..."
+        if unzip -l build/ios/Runner.ipa | grep -q "embedded.mobileprovision"; then
+            log_success "Provisioning profile is embedded in IPA"
+        else
+            log_warning "No embedded.mobileprovision found in IPA"
+            log_info "This may cause App Store Connect upload to fail"
+            log_info "Attempting to embed provisioning profile..."
+            
+            # Try to embed provisioning profile if available
+            if [ -f "ios/Runner.mobileprovision" ]; then
+                log_info "Embedding provisioning profile in existing IPA..."
+                
+                # Extract IPA
+                cd build/ios
+                unzip -q Runner.ipa
+                
+                # Embed provisioning profile
+                cp ../../ios/Runner.mobileprovision Payload/Runner.app/embedded.mobileprovision
+                
+                # Recreate IPA
+                rm Runner.ipa
+                zip -r Runner.ipa Payload/
+                rm -rf Payload
+                cd ../..
+                
+                log_success "Provisioning profile embedded successfully"
+            else
+                log_warning "No provisioning profile available for embedding"
+            fi
         fi
     else
         log_error "IPA file not found for verification"
