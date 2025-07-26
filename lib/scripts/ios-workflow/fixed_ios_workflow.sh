@@ -1026,6 +1026,123 @@ EOF
     log_success "Output artifacts created"
 }
 
+# Function to validate and register bundle ID in App Store Connect
+validate_bundle_id() {
+    log_info "Validating bundle ID in App Store Connect..."
+    
+    local key_id="${APP_STORE_CONNECT_KEY_IDENTIFIER:-}"
+    local issuer_id="${APP_STORE_CONNECT_ISSUER_ID:-}"
+    local api_key_path="ios/AuthKey_${key_id}.p8"
+    local bundle_id="${BUNDLE_ID:-}"
+    
+    if [ -z "$key_id" ] || [ -z "$issuer_id" ] || [ ! -f "$api_key_path" ] || [ -z "$bundle_id" ]; then
+        log_warning "Cannot validate bundle ID - missing credentials"
+        return 0
+    fi
+    
+    # Check if bundle ID exists
+    log_info "Checking if bundle ID '$bundle_id' exists in App Store Connect..."
+    
+    # List all apps to see if our bundle ID exists
+    local app_list=$(xcrun altool --list-apps \
+                                   --apiKey "$key_id" \
+                                   --apiIssuer "$issuer_id" \
+                                   --apiKeyPath "$api_key_path" 2>/dev/null || echo "")
+    
+    if echo "$app_list" | grep -q "$bundle_id"; then
+        log_success "Bundle ID '$bundle_id' found in App Store Connect"
+        return 0
+    else
+        log_warning "Bundle ID '$bundle_id' not found in App Store Connect"
+        log_info "You need to create an app with this bundle ID in App Store Connect first"
+        log_info "Steps to fix:"
+        log_info "1. Go to App Store Connect (https://appstoreconnect.apple.com)"
+        log_info "2. Click 'My Apps'"
+        log_info "3. Click '+' to add a new app"
+        log_info "4. Enter bundle ID: $bundle_id"
+        log_info "5. Complete app creation"
+        log_info "6. Try upload again"
+        return 1
+    fi
+}
+
+# Function to upload to App Store Connect
+upload_to_app_store() {
+    log_info "Uploading to App Store Connect..."
+    
+    if [ -f "build/ios/Runner.ipa" ]; then
+        log_info "Found IPA file, preparing for App Store Connect upload..."
+        
+        # Check if we have the required credentials
+        local key_id="${APP_STORE_CONNECT_KEY_IDENTIFIER:-}"
+        local issuer_id="${APP_STORE_CONNECT_ISSUER_ID:-}"
+        local api_key_path="ios/AuthKey_${key_id}.p8"
+        local bundle_id="${BUNDLE_ID:-}"
+        
+        if [ -z "$key_id" ] || [ -z "$issuer_id" ] || [ ! -f "$api_key_path" ] || [ -z "$bundle_id" ]; then
+            log_warning "App Store Connect credentials not provided or API key not found, skipping upload"
+            log_info "IPA file is available at: build/ios/Runner.ipa"
+            log_info "Required variables: APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID, BUNDLE_ID"
+            return 0
+        fi
+        
+        # Validate bundle ID exists in App Store Connect
+        if ! validate_bundle_id; then
+            log_warning "Bundle ID validation failed, but attempting upload anyway..."
+        fi
+        
+        # Validate IPA file before upload
+        log_info "Validating IPA file before upload..."
+        if ! xcrun altool --validate-app \
+                          --type ios \
+                          --file build/ios/Runner.ipa \
+                          --apiKey "$key_id" \
+                          --apiIssuer "$issuer_id" \
+                          --apiKeyPath "$api_key_path" 2>/dev/null; then
+            log_warning "IPA validation failed, but attempting upload anyway..."
+        else
+            log_success "IPA validation passed"
+        fi
+        
+        # Upload with retry mechanism
+        local max_retries=3
+        local retry_count=0
+        
+        while [ $retry_count -lt $max_retries ]; do
+            log_info "Upload attempt $((retry_count + 1)) of $max_retries..."
+            
+            if xcrun altool --upload-app \
+                            --type ios \
+                            --file build/ios/Runner.ipa \
+                            --apiKey "$key_id" \
+                            --apiIssuer "$issuer_id" \
+                            --apiKeyPath "$api_key_path" \
+                            --verbose; then
+                log_success "Successfully uploaded to App Store Connect"
+                return 0
+            else
+                retry_count=$((retry_count + 1))
+                if [ $retry_count -lt $max_retries ]; then
+                    log_warning "Upload failed, retrying in 60 seconds..."
+                    sleep 60
+                else
+                    log_error "Failed to upload to App Store Connect after $max_retries attempts"
+                    log_info "IPA file is available at: build/ios/Runner.ipa"
+                    log_info "You can manually upload this file to App Store Connect"
+                    log_info "Common issues:"
+                    log_info "1. Bundle ID '$bundle_id' not registered in App Store Connect"
+                    log_info "2. App not created in App Store Connect"
+                    log_info "3. Invalid API key or permissions"
+                    return 1
+                fi
+            fi
+        done
+    else
+        log_error "IPA file not found for upload"
+        exit 1
+    fi
+}
+
 # Main workflow function
 main() {
     log_info "Starting Fixed iOS Workflow"
@@ -1074,6 +1191,13 @@ main() {
     else
         log_error "IPA file not found. Build failed."
         exit 1
+    fi
+    
+    # Step 12: Upload to App Store Connect (optional)
+    if [ "${UPLOAD_TO_APP_STORE:-false}" = "true" ]; then
+        upload_to_app_store
+    else
+        log_info "Skipping App Store Connect upload (UPLOAD_TO_APP_STORE=false)"
     fi
     
     # Send success notification

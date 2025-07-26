@@ -395,6 +395,9 @@ workflows:
         CERT_P12_URL: $CERT_P12_URL
         CERT_CER_URL: $CERT_CER_URL
         CERT_KEY_URL: $CERT_KEY_URL
+        
+        # App Store Connect Upload
+        UPLOAD_TO_APP_STORE: "${UPLOAD_TO_APP_STORE:-false}"
       xcode: 16.0
       cocoapods: 1.16.2
       flutter: 3.32.2
