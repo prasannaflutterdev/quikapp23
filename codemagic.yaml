@@ -404,10 +404,10 @@ workflows:
         - "$HOME/Library/Caches/CocoaPods"
 
     scripts:
-      - name: 🚀 Simple iOS Workflow
+      - name: 🚀 Enhanced iOS Workflow
         script: |
-          chmod +x lib/scripts/ios-workflow/simple_ios_workflow.sh
-          bash lib/scripts/ios-workflow/simple_ios_workflow.sh
+          chmod +x lib/scripts/ios-workflow/enhanced_ios_workflow.sh
+          bash lib/scripts/ios-workflow/enhanced_ios_workflow.sh
 
     artifacts:
       - build/export/*.ipa
