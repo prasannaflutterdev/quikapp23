@@ -172,27 +172,38 @@ download_certificates() {
     # Download certificates (Option 1: P12)
     if [ -n "${CERT_P12_URL:-}" ] && [ -n "${CERT_PASSWORD:-}" ]; then
         log_info "Using P12 certificate option"
-        if download_file "$CERT_P12_URL" "ios/certificates.p12" "P12 certificate"; then
-            log_success "P12 certificate downloaded successfully"
-            echo "$CERT_PASSWORD" > ios/cert_password.txt
+        local cert_p12_url=$(safe_env_var "CERT_P12_URL" "")
+        if [ -n "$cert_p12_url" ]; then
+            if download_file "$cert_p12_url" "ios/certificates.p12" "P12 certificate"; then
+                log_success "P12 certificate downloaded successfully"
+                echo "$CERT_PASSWORD" > ios/cert_password.txt
+            else
+                log_warning "Failed to download P12 certificate"
+            fi
         else
-            log_warning "Failed to download P12 certificate"
+            log_warning "CERT_P12_URL is empty or not properly set"
         fi
     # Option 2: CER + KEY
     elif [ -n "${CERT_CER_URL:-}" ] && [ -n "${CERT_KEY_URL:-}" ]; then
         log_info "Using CER + KEY certificate option"
-        if download_file "$CERT_CER_URL" "ios/certificate.cer" "CER certificate" && \
-           download_file "$CERT_KEY_URL" "ios/private.key" "private key"; then
-            log_success "CER certificate and private key downloaded successfully"
-            # Generate P12 from CER + KEY
-            if command -v openssl >/dev/null 2>&1; then
-                openssl pkcs12 -export -in ios/certificate.cer -inkey ios/private.key \
-                    -out ios/certificates.p12 -passout pass:"${CERT_PASSWORD:-password}" 2>/dev/null || true
-                echo "${CERT_PASSWORD:-password}" > ios/cert_password.txt
-                log_success "Generated P12 certificate from CER + KEY"
+        local cert_cer_url=$(safe_env_var "CERT_CER_URL" "")
+        local cert_key_url=$(safe_env_var "CERT_KEY_URL" "")
+        if [ -n "$cert_cer_url" ] && [ -n "$cert_key_url" ]; then
+            if download_file "$cert_cer_url" "ios/certificate.cer" "CER certificate" && \
+               download_file "$cert_key_url" "ios/private.key" "private key"; then
+                log_success "CER certificate and private key downloaded successfully"
+                # Generate P12 from CER + KEY
+                if command -v openssl >/dev/null 2>&1; then
+                    openssl pkcs12 -export -in ios/certificate.cer -inkey ios/private.key \
+                        -out ios/certificates.p12 -passout pass:"${CERT_PASSWORD:-password}" 2>/dev/null || true
+                    echo "${CERT_PASSWORD:-password}" > ios/cert_password.txt
+                    log_success "Generated P12 certificate from CER + KEY"
+                fi
+            else
+                log_warning "Failed to download CER certificate or private key"
             fi
         else
-            log_warning "Failed to download CER certificate or private key"
+            log_warning "CERT_CER_URL or CERT_KEY_URL is empty or not properly set"
         fi
     else
         log_info "No certificate configuration provided (using App Store Connect API)"
@@ -295,65 +306,129 @@ generate_env_config() {
     # Create config directory
     mkdir -p lib/config
     
-    # Generate the env_config.dart file with actual values
+    # Function to safely escape strings for Dart
+    escape_dart_string() {
+        local value="$1"
+        # Escape quotes and special characters
+        echo "$value" | sed 's/"/\\"/g' | sed 's/\\/\\\\/g'
+    }
+    
+    # Function to safely handle JSON strings
+    escape_json_string() {
+        local value="$1"
+        # Escape quotes and special characters for JSON
+        echo "$value" | sed 's/"/\\"/g' | sed 's/\\/\\\\/g' | sed 's/\n/\\n/g'
+    }
+    
+    # Get safe values
+    local app_name=$(escape_dart_string "${APP_NAME:-}")
+    local web_url=$(escape_dart_string "${WEB_URL:-}")
+    local org_name=$(escape_dart_string "${ORG_NAME:-}")
+    local email_id=$(escape_dart_string "${EMAIL_ID:-}")
+    local user_name=$(escape_dart_string "${USER_NAME:-}")
+    local app_id=$(escape_dart_string "${APP_ID:-}")
+    local version_name=$(escape_dart_string "${VERSION_NAME:-}")
+    local version_code="${VERSION_CODE:-0}"
+    
+    local push_notify="${PUSH_NOTIFY:-false}"
+    local is_chatbot="${IS_CHATBOT:-false}"
+    local is_domain_url="${IS_DOMAIN_URL:-false}"
+    local is_splash="${IS_SPLASH:-true}"
+    local is_pulldown="${IS_PULLDOWN:-false}"
+    local is_bottommenu="${IS_BOTTOMMENU:-false}"
+    local is_load_ind="${IS_LOAD_IND:-false}"
+    
+    local is_camera="${IS_CAMERA:-false}"
+    local is_location="${IS_LOCATION:-false}"
+    local is_mic="${IS_MIC:-false}"
+    local is_notification="${IS_NOTIFICATION:-false}"
+    local is_contact="${IS_CONTACT:-false}"
+    local is_biometric="${IS_BIOMETRIC:-false}"
+    local is_calendar="${IS_CALENDAR:-false}"
+    local is_storage="${IS_STORAGE:-false}"
+    
+    local splash_bg_color=$(escape_dart_string "${SPLASH_BG_COLOR:-#FFFFFF}")
+    local splash_tagline=$(escape_dart_string "${SPLASH_TAGLINE:-}")
+    local splash_tagline_color=$(escape_dart_string "${SPLASH_TAGLINE_COLOR:-#000000}")
+    local splash_animation=$(escape_dart_string "${SPLASH_ANIMATION:-fade}")
+    local splash_duration="${SPLASH_DURATION:-3}"
+    local splash_url=$(escape_dart_string "${SPLASH_URL:-}")
+    local splash_bg=$(escape_dart_string "${SPLASH_BG_URL:-}")
+    
+    # Handle bottom menu items as a simple string to avoid JSON parsing issues
+    local bottommenu_items=$(escape_dart_string "${BOTTOMMENU_ITEMS:-[]}")
+    local bottommenu_bg_color=$(escape_dart_string "${BOTTOMMENU_BG_COLOR:-#FFFFFF}")
+    local bottommenu_active_tab_color=$(escape_dart_string "${BOTTOMMENU_ACTIVE_TAB_COLOR:-#007AFF}")
+    local bottommenu_text_color=$(escape_dart_string "${BOTTOMMENU_TEXT_COLOR:-#666666}")
+    local bottommenu_icon_color=$(escape_dart_string "${BOTTOMMENU_ICON_COLOR:-#666666}")
+    local bottommenu_icon_position=$(escape_dart_string "${BOTTOMMENU_ICON_POSITION:-above}")
+    local bottommenu_font=$(escape_dart_string "${BOTTOMMENU_FONT:-Roboto}")
+    local bottommenu_font_size="${BOTTOMMENU_FONT_SIZE:-12}"
+    local bottommenu_font_bold="${BOTTOMMENU_FONT_BOLD:-false}"
+    local bottommenu_font_italic="${BOTTOMMENU_FONT_ITALIC:-false}"
+    
+    local firebase_config_android=$(escape_dart_string "${FIREBASE_CONFIG_ANDROID:-}")
+    local firebase_config_ios=$(escape_dart_string "${FIREBASE_CONFIG_IOS:-}")
+    
+    # Generate the env_config.dart file with safe values
     cat > lib/config/env_config.dart << EOF
 // Generated by Fixed iOS Workflow Script
 // Do not edit manually
 
 class EnvConfig {
   // App Information
-  static const String appName = "${APP_NAME:-}";
-  static const String webUrl = "${WEB_URL:-}";
-  static const String orgName = "${ORG_NAME:-}";
-  static const String emailId = "${EMAIL_ID:-}";
-  static const String userName = "${USER_NAME:-}";
-  static const String appId = "${APP_ID:-}";
-  static const String versionName = "${VERSION_NAME:-}";
-  static const int versionCode = ${VERSION_CODE:-0};
+  static const String appName = "$app_name";
+  static const String webUrl = "$web_url";
+  static const String orgName = "$org_name";
+  static const String emailId = "$email_id";
+  static const String userName = "$user_name";
+  static const String appId = "$app_id";
+  static const String versionName = "$version_name";
+  static const int versionCode = $version_code;
 
   // Feature Flags
-  static const bool pushNotify = ${PUSH_NOTIFY:-false};
-  static const bool isChatbot = ${IS_CHATBOT:-false};
-  static const bool isDomainUrl = ${IS_DOMAIN_URL:-false};
-  static const bool isSplash = ${IS_SPLASH:-true};
-  static const bool isPulldown = ${IS_PULLDOWN:-false};
-  static const bool isBottommenu = ${IS_BOTTOMMENU:-false};
-  static const bool isLoadIndicator = ${IS_LOAD_IND:-false};
+  static const bool pushNotify = $push_notify;
+  static const bool isChatbot = $is_chatbot;
+  static const bool isDomainUrl = $is_domain_url;
+  static const bool isSplash = $is_splash;
+  static const bool isPulldown = $is_pulldown;
+  static const bool isBottommenu = $is_bottommenu;
+  static const bool isLoadIndicator = $is_load_ind;
 
   // Permissions
-  static const bool isCamera = ${IS_CAMERA:-false};
-  static const bool isLocation = ${IS_LOCATION:-false};
-  static const bool isMic = ${IS_MIC:-false};
-  static const bool isNotification = ${IS_NOTIFICATION:-false};
-  static const bool isContact = ${IS_CONTACT:-false};
-  static const bool isBiometric = ${IS_BIOMETRIC:-false};
-  static const bool isCalendar = ${IS_CALENDAR:-false};
-  static const bool isStorage = ${IS_STORAGE:-false};
+  static const bool isCamera = $is_camera;
+  static const bool isLocation = $is_location;
+  static const bool isMic = $is_mic;
+  static const bool isNotification = $is_notification;
+  static const bool isContact = $is_contact;
+  static const bool isBiometric = $is_biometric;
+  static const bool isCalendar = $is_calendar;
+  static const bool isStorage = $is_storage;
 
   // UI Configuration
-  static const String splashBgColor = "${SPLASH_BG_COLOR:-#FFFFFF}";
-  static const String splashTagline = "${SPLASH_TAGLINE:-}";
-  static const String splashTaglineColor = "${SPLASH_TAGLINE_COLOR:-#000000}";
-  static const String splashAnimation = "${SPLASH_ANIMATION:-fade}";
-  static const int splashDuration = ${SPLASH_DURATION:-3};
-  static const String splashUrl = "${SPLASH_URL:-}";
-  static const String splashBg = "${SPLASH_BG_URL:-}";
+  static const String splashBgColor = "$splash_bg_color";
+  static const String splashTagline = "$splash_tagline";
+  static const String splashTaglineColor = "$splash_tagline_color";
+  static const String splashAnimation = "$splash_animation";
+  static const int splashDuration = $splash_duration;
+  static const String splashUrl = "$splash_url";
+  static const String splashBg = "$splash_bg";
 
   // Bottom Menu Configuration
-  static const String bottommenuItems = "${BOTTOMMENU_ITEMS:-[]}";
-  static const String bottommenuBgColor = "${BOTTOMMENU_BG_COLOR:-#FFFFFF}";
-  static const String bottommenuActiveTabColor = "${BOTTOMMENU_ACTIVE_TAB_COLOR:-#007AFF}";
-  static const String bottommenuTextColor = "${BOTTOMMENU_TEXT_COLOR:-#666666}";
-  static const String bottommenuIconColor = "${BOTTOMMENU_ICON_COLOR:-#666666}";
-  static const String bottommenuIconPosition = "${BOTTOMMENU_ICON_POSITION:-above}";
-  static const String bottommenuFont = "${BOTTOMMENU_FONT:-Roboto}";
-  static const double bottommenuFontSize = ${BOTTOMMENU_FONT_SIZE:-12};
-  static const bool bottommenuFontBold = ${BOTTOMMENU_FONT_BOLD:-false};
-  static const bool bottommenuFontItalic = ${BOTTOMMENU_FONT_ITALIC:-false};
+  static const String bottommenuItems = "$bottommenu_items";
+  static const String bottommenuBgColor = "$bottommenu_bg_color";
+  static const String bottommenuActiveTabColor = "$bottommenu_active_tab_color";
+  static const String bottommenuTextColor = "$bottommenu_text_color";
+  static const String bottommenuIconColor = "$bottommenu_icon_color";
+  static const String bottommenuIconPosition = "$bottommenu_icon_position";
+  static const String bottommenuFont = "$bottommenu_font";
+  static const double bottommenuFontSize = $bottommenu_font_size;
+  static const bool bottommenuFontBold = $bottommenu_font_bold;
+  static const bool bottommenuFontItalic = $bottommenu_font_italic;
 
   // Firebase Configuration
-  static const String firebaseConfigAndroid = "${FIREBASE_CONFIG_ANDROID:-}";
-  static const String firebaseConfigIos = "${FIREBASE_CONFIG_IOS:-}";
+  static const String firebaseConfigAndroid = "$firebase_config_android";
+  static const String firebaseConfigIos = "$firebase_config_ios";
 }
 EOF
 
@@ -363,8 +438,20 @@ EOF
         log_success "env_config.dart generated successfully"
     else
         log_error "Generated env_config.dart has syntax errors"
-        dart analyze lib/config/env_config.dart
-        exit 1
+        log_info "Attempting to fix common issues..."
+        
+        # Try to fix common issues
+        sed -i '' 's/\\"/"/g' lib/config/env_config.dart
+        sed -i '' 's/\\\\/\\/g' lib/config/env_config.dart
+        
+        # Validate again
+        if dart analyze lib/config/env_config.dart > /dev/null 2>&1; then
+            log_success "env_config.dart fixed and validated successfully"
+        else
+            log_error "Could not fix env_config.dart syntax errors"
+            dart analyze lib/config/env_config.dart
+            exit 1
+        fi
     fi
 }
 
