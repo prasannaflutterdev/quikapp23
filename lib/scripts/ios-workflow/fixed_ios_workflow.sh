@@ -1043,6 +1043,24 @@ validate_bundle_id() {
     # Check if bundle ID exists
     log_info "Checking if bundle ID '$bundle_id' exists in App Store Connect..."
     
+    # Create the expected directory structure for altool
+    mkdir -p ~/.appstoreconnect/private_keys
+    mkdir -p ~/private_keys
+    mkdir -p ~/.private_keys
+    mkdir -p ~/clone/private_keys
+    
+    # Copy API key to all expected locations
+    cp "$api_key_path" ~/.appstoreconnect/private_keys/ 2>/dev/null || true
+    cp "$api_key_path" ~/private_keys/ 2>/dev/null || true
+    cp "$api_key_path" ~/.private_keys/ 2>/dev/null || true
+    cp "$api_key_path" ~/clone/private_keys/ 2>/dev/null || true
+    
+    # Set proper permissions
+    chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${key_id}.p8 2>/dev/null || true
+    chmod 600 ~/private_keys/AuthKey_${key_id}.p8 2>/dev/null || true
+    chmod 600 ~/.private_keys/AuthKey_${key_id}.p8 2>/dev/null || true
+    chmod 600 ~/clone/private_keys/AuthKey_${key_id}.p8 2>/dev/null || true
+    
     # List all apps to see if our bundle ID exists
     local app_list=$(xcrun altool --list-apps \
                                    --apiKey "$key_id" \
@@ -1084,6 +1102,43 @@ upload_to_app_store() {
             log_info "IPA file is available at: build/ios/Runner.ipa"
             log_info "Required variables: APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID, BUNDLE_ID"
             return 0
+        fi
+        
+        # Create the expected directory structure for altool
+        log_info "Setting up API key for altool..."
+        mkdir -p ~/.appstoreconnect/private_keys
+        mkdir -p ~/private_keys
+        mkdir -p ~/.private_keys
+        mkdir -p ~/clone/private_keys
+        
+        # Copy API key to all expected locations
+        cp "$api_key_path" ~/.appstoreconnect/private_keys/
+        cp "$api_key_path" ~/private_keys/
+        cp "$api_key_path" ~/.private_keys/
+        cp "$api_key_path" ~/clone/private_keys/
+        
+        # Set proper permissions
+        chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${key_id}.p8
+        chmod 600 ~/private_keys/AuthKey_${key_id}.p8
+        chmod 600 ~/.private_keys/AuthKey_${key_id}.p8
+        chmod 600 ~/clone/private_keys/AuthKey_${key_id}.p8
+        
+        log_success "API key copied to all expected locations for altool"
+        
+        # Verify API key is accessible
+        log_info "Verifying API key accessibility..."
+        local key_found=false
+        for dir in ~/.appstoreconnect/private_keys ~/private_keys ~/.private_keys ~/clone/private_keys; do
+            if [ -f "$dir/AuthKey_${key_id}.p8" ]; then
+                log_success "API key found in $dir"
+                key_found=true
+            fi
+        done
+        
+        if [ "$key_found" = false ]; then
+            log_error "API key not found in any expected location"
+            log_info "IPA file is available at: build/ios/Runner.ipa"
+            return 1
         fi
         
         # Validate bundle ID exists in App Store Connect
